@@ -84,8 +84,8 @@
     }
   },
   "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
+    "light": "/logo/shadowcorp_logo.png",
+    "dark": "/logo/shadowcorp_logo.png"
   },
   "navbar": {
     "links": [
