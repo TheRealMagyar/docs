@@ -8,81 +8,6 @@
     "dark": "#15803D"
   },
   "favicon": "/favicon.svg",
-  "navigation": {
-    "tabs": [
-      {
-        "tab": "SDK",
-        "groups": [
-          {
-            "group": "Getting started",
-            "pages": [
-              "index",
-              "quickstart",
-              "development"
-            ]
-          },
-          {
-            "group": "Customization",
-            "pages": [
-              "essentials/settings",
-              "essentials/navigation"
-            ]
-          },
-          {
-            "group": "Writing content",
-            "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
-            ]
-          },
-          {
-            "group": "AI tools",
-            "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
-            ]
-          }
-        ]
-      },
-      {
-        "tab": "API reference",
-        "groups": [
-          {
-            "group": "API documentation",
-            "pages": [
-              "api-reference/introduction"
-            ]
-          },
-          {
-            "group": "Endpoint examples",
-            "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
-            ]
-          }
-        ]
-      }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
   "logo": {
     "light": "/logo/shadowcorp_logo.png",
     "dark": "/logo/shadowcorp_logo.png"
@@ -100,17 +25,126 @@
       "href": "https://dashboard.mintlify.com"
     }
   },
+  "navigation": {
+    "global": {
+      "anchors": [
+        {
+          "anchor": "Discord",
+          "icon": "discord",
+          "href": "https://mintlify.com/docs"
+        },
+        {
+          "anchor": "X",
+          "icon": "x",
+          "href": "https://mintlify.com/blog"
+        }
+      ]
+    },
+    "tabs": [
+      {
+        "tab": "NEAR SDKs",
+        "groups": [
+          {
+            "group": "Getting started",
+            "icon": "flag",
+            "pages": ["index", "quickstart", "development"]
+          },
+          {
+            "group": "Shadowcorp SDK",
+            "icon": "book",
+            "pages": [
+              "Installation",
+              {
+                "group": "Basics",
+                "pages": ["api-reference/health", "api-reference/stats"]
+              },
+              {
+                "group": "Blocks & Transactions",
+                "pages": ["api-reference/blocks", "api-reference/transactions"]
+              },
+              {
+                "group": "Transfers",
+                "pages": [
+                  "api-reference/ft-transfers",
+                  "api-reference/nft-transfers"
+                ]
+              },
+              {
+                "group": "Assets",
+                "pages": ["api-reference/tokens", "api-reference/nfts"]
+              },
+              {
+                "group": "Accounts",
+                "pages": ["api-reference/accounts"]
+              },
+              {
+                "group": "Validators",
+                "pages": ["api-reference/validators"]
+              },
+              {
+                "group": "Alerts",
+                "pages": ["api-reference/alerts"]
+              },
+              {
+                "group": "Advanced",
+                "pages": ["api-reference/rpc", "api-reference/graph"]
+              }
+            ]
+          },
+          {
+            "group": "NEAR Connect SDK",
+            "icon": "plug",
+            "pages": [
+              "near-connect/introduction",
+              "near-connect/wallet-integration",
+              "near-connect/security-features",
+              "near-connect/ui-components",
+              "near-connect/advanced-features",
+              {
+                "group": "Examples",
+                "icon": "code",
+                "pages": [
+                  "near-connect/examples/basic-wallet",
+                  "near-connect/examples/ledger-hardware",
+                  "near-connect/examples/secure-transactions",
+                  "near-connect/examples/mobile-walletconnect"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "SUI SDKs",
+        "groups": [
+          {
+            "group": "Introduction",
+            "pages": ["api-reference/introduction"]
+          }
+        ]
+      },
+      {
+        "tab": "Shadow API",
+        "groups": [
+          {
+            "group": "Introduction",
+            "pages": ["api-reference/introduction"]
+          }
+        ]
+      }
+    ]
+  },
   "contextual": {
     "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
+      "copy",
+      "view",
+      "chatgpt",
+      "claude",
+      "perplexity",
+      "mcp",
+      "cursor",
+      "vscode"
+    ]
   },
   "footer": {
     "socials": {

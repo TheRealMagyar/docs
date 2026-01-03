@@ -1,97 +1,78 @@
 ---
 title: "Introduction"
-description: "Welcome to the new home for your documentation"
+description: "Official JavaScript/TypeScript SDK for the ShadowCorp NEAR Blockchain API"
 ---
 
-## Setting up
+## Welcome to the ShadowCorp SDK
 
-Get your documentation site up and running in minutes.
+The **ShadowCorp SDK** is the official client library for interacting with the ShadowCorp NEAR Blockchain API. It provides a clean, typed, and intuitive interface to access on-chain data, analytics, and forensic tools – all with full TypeScript support.
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
+Whether you're building a block explorer, wallet analytics dashboard, DeFi tracker, or conducting blockchain investigations, this SDK makes it easy to fetch blocks, transactions, account details, token/NFT transfers, validator info, anomaly alerts, RPC calls, and read-only graph queries.
+
+<Card title="Quickstart" icon="rocket" href="/quickstart" horizontal>
+  Install the SDK and make your first API call in under 5 minutes.
 </Card>
 
-## Make it yours
+## Features
 
-Design a docs site that looks great and empowers your users.
+Explore the full power of the ShadowCorp NEAR API through a modern, developer-friendly SDK.
 
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
+<Columns>
+  <Card title="Full API Coverage" icon="cube" href="/api-reference/health">
+    Health checks, network stats, blocks, transactions, accounts, tokens, NFTs,
+    validators, alerts, RPC proxy, and graph queries.
   </Card>
   <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
-  </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
-  </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
-  </Card>
-</Columns>
-
-## Create beautiful pages
-
-Everything you need to create world-class documentation.
-
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
+    title="TypeScript First"
     icon="code"
-    href="/essentials/code"
+    href="/quickstart#typescript-support"
   >
-    Add sample code to demonstrate how to use your product.
+    Complete type definitions, autocompletion, and compile-time safety out of
+    the box.
   </Card>
   <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
+    title="JavaScript Compatible"
+    icon="js"
+    href="/quickstart#javascript-usage"
   >
-    Display images and other media.
+    Works seamlessly in pure JavaScript projects with excellent IntelliSense via
+    JSDoc.
   </Card>
   <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
+    title="Simple & Consistent API"
+    icon="wand-magic-sparkles"
+    href="/api-reference/accounts"
   >
-    Write once and reuse across your docs.
+    Organized, intuitive methods like `sdk.accounts.getFull('example.near')`.
   </Card>
 </Columns>
 
-## Need inspiration?
+## Built for Real-World Use
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
+Everything you need to build powerful NEAR blockchain applications.
+
+<Columns>
+  <Card title="Authentication" icon="key" href="/quickstart#authentication">
+    Simple API key setup with automatic header injection.
+  </Card>
+  <Card title="Error Handling" icon="shield" href="/guides/error-handling">
+    Built-in custom errors (AuthError, RateLimitError, etc.) for predictable
+    control flow.
+  </Card>
+  <Card
+    title="Pagination Support"
+    icon="arrows-up-down"
+    href="/guides/pagination"
+  >
+    Easy handling of list endpoints with limit/offset.
+  </Card>
+  <Card title="RPC & Graph Queries" icon="database" href="/api-reference/rpc">
+    Full JSON-RPC proxy and read-only Cypher queries for advanced analytics.
+  </Card>
+</Columns>
+
+## Ready to dive in?
+
+<Card title="Get Started" icon="play" href="/quickstart">
+  Install the SDK and start querying the NEAR blockchain today.
 </Card>
