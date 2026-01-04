@@ -50,6 +50,10 @@
         "tab": "NEAR SDKs",
         "groups": [
           {
+            "group": "Start here",
+            "pages": ["index"]
+          },
+          {
             "group": "Shadowcorp SDK",
             "pages": [
               "shadowcorp-sdk/installation",

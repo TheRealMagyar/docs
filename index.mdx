@@ -1,78 +1,48 @@
 ---
-title: "Introduction"
-description: "Official JavaScript/TypeScript SDK for the ShadowCorp NEAR Blockchain API"
+title: "Start here"
+description: "Welcome to ShadowCorp - NEAR blockchain development tools"
+icon: book
 ---
 
-## Welcome to the ShadowCorp SDK
+import { Callout } from '@/components/ui/callout'
 
-The **ShadowCorp SDK** is the official client library for interacting with the ShadowCorp NEAR Blockchain API. It provides a clean, typed, and intuitive interface to access on-chain data, analytics, and forensic tools – all with full TypeScript support.
+## Two Products, One Goal
 
-Whether you're building a block explorer, wallet analytics dashboard, DeFi tracker, or conducting blockchain investigations, this SDK makes it easy to fetch blocks, transactions, account details, token/NFT transfers, validator info, anomaly alerts, RPC calls, and read-only graph queries.
+### ShadowCorp SDK
+**Query blockchain data and analytics**
 
-<Card title="Quickstart" icon="rocket" href="/quickstart" horizontal>
-  Install the SDK and make your first API call in under 5 minutes.
-</Card>
+Access blocks, transactions, accounts, tokens, validators, and DeFi positions. Execute JSON-RPC calls and Neo4j graph queries for forensic analysis.
 
-## Features
+Perfect for: Analytics platforms, explorers, compliance tools, trading bots.
 
-Explore the full power of the ShadowCorp NEAR API through a modern, developer-friendly SDK.
+**[Get Started →](/shadowcorp-sdk/installation)**
 
-<Columns>
-  <Card title="Full API Coverage" icon="cube" href="/api-reference/health">
-    Health checks, network stats, blocks, transactions, accounts, tokens, NFTs,
-    validators, alerts, RPC proxy, and graph queries.
-  </Card>
-  <Card
-    title="TypeScript First"
-    icon="code"
-    href="/quickstart#typescript-support"
-  >
-    Complete type definitions, autocompletion, and compile-time safety out of
-    the box.
-  </Card>
-  <Card
-    title="JavaScript Compatible"
-    icon="js"
-    href="/quickstart#javascript-usage"
-  >
-    Works seamlessly in pure JavaScript projects with excellent IntelliSense via
-    JSDoc.
-  </Card>
-  <Card
-    title="Simple & Consistent API"
-    icon="wand-magic-sparkles"
-    href="/api-reference/accounts"
-  >
-    Organized, intuitive methods like `sdk.accounts.getFull('example.near')`.
-  </Card>
-</Columns>
+### NearConnect
+**Connect wallets to your dApp**
 
-## Built for Real-World Use
+Four-tier wallet architecture supporting web, extension, hardware (Ledger), and mobile wallets. Includes pre-built UI components and multi-layer security.
 
-Everything you need to build powerful NEAR blockchain applications.
+Perfect for: dApps, DeFi platforms, NFT marketplaces, games.
 
-<Columns>
-  <Card title="Authentication" icon="key" href="/quickstart#authentication">
-    Simple API key setup with automatic header injection.
-  </Card>
-  <Card title="Error Handling" icon="shield" href="/guides/error-handling">
-    Built-in custom errors (AuthError, RateLimitError, etc.) for predictable
-    control flow.
-  </Card>
-  <Card
-    title="Pagination Support"
-    icon="arrows-up-down"
-    href="/guides/pagination"
-  >
-    Easy handling of list endpoints with limit/offset.
-  </Card>
-  <Card title="RPC & Graph Queries" icon="database" href="/api-reference/rpc">
-    Full JSON-RPC proxy and read-only Cypher queries for advanced analytics.
-  </Card>
-</Columns>
+**[Get Started →](/nearconnect-installation)**
 
-## Ready to dive in?
+## Quick Links
 
-<Card title="Get Started" icon="play" href="/quickstart">
-  Install the SDK and start querying the NEAR blockchain today.
-</Card>
+### ShadowCorp SDK Documentation
+- [Installation](/shadowcorp-sdk/installation) - Set up the SDK
+- [Health & Stats](/shadowcorp-sdk/health) - API status and network metrics
+- [Blocks & Transactions](/shadowcorp-sdk/blocks) - Query blockchain data
+- [Token Transfers](/shadowcorp-sdk/transfers) - Track FT/NFT movements
+- [Accounts](/shadowcorp-sdk/account-full) - Complete account profiles
+- [Validators](/shadowcorp-sdk/validators) - Staking information
+- [Graph Queries](/shadowcorp-sdk/graph) - Neo4j forensic analysis
+- [JSON-RPC](/shadowcorp-sdk/json-rpc) - Direct RPC access
+
+### NearConnect Documentation
+- [Installation](/near-connect/installation) - Set up NearConnect
+- [Quick Start](/near-connect/quick-start) - Connect your first wallet
+- [Security Features](/near-connect/security-features) - Transaction protection
+
+## Need Help?
+
+**Email**: [support@shadowcorp.dev](mailto:support@shadowcorp.dev)
