@@ -1,0 +1,578 @@
+---
+title: "Token & NFT Transfers"
+description: "Track fungible token (FT) and non-fungible token (NFT) transfers across the NEAR blockchain. Monitor token movements, analyze trading activity, and build comprehensive token histories."
+icon: box
+---
+
+import { Callout } from '@/components/ui/callout'
+import { CodeGroup } from '@/components/ui/code-group'
+
+## Fungible Token (FT) Transfers
+
+List fungible token transfers with flexible filtering options.
+
+### Basic Usage
+
+```typescript
+import { ShadowCorpSDK } from 'shadowcorp';
+
+const sdk = new ShadowCorpSDK('your-api-key');
+
+// List all FT transfers
+const ftTransfers = await sdk.transfers.listFtTransfers({
+  limit: 20
+});
+console.log(ftTransfers);
+```
+
+### Filter by Account
+
+Get all FT transfers for a specific account:
+
+```typescript
+const ftTransfers = await sdk.transfers.listFtTransfers({
+  account: 'example.near',
+  limit: 20
+});
+```
+
+<Callout type="info">
+When filtering by account, results include transfers where the account is either the sender or receiver.
+</Callout>
+
+### Filter by Token
+
+Track transfers of a specific token contract:
+
+```typescript
+const usdcTransfers = await sdk.transfers.listFtTransfers({
+  token_id: 'usdc.near',
+  limit: 50
+});
+```
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `limit` | `number` | No | Number of results to return (default: 50, max: 100) |
+| `offset` | `number` | No | Number of results to skip for pagination |
+| `account` | `string` | No | Filter by account ID (sender or receiver) |
+| `token_id` | `string` | No | Filter by token contract ID |
+
+## Non-Fungible Token (NFT) Transfers
+
+List non-fungible token transfers to track NFT ownership changes.
+
+### Basic Usage
+
+```typescript
+// List all NFT transfers
+const nftTransfers = await sdk.transfers.listNftTransfers({
+  limit: 20
+});
+console.log(nftTransfers);
+```
+
+### Filter by Account
+
+Get NFT transfer history for an account:
+
+```typescript
+const nftTransfers = await sdk.transfers.listNftTransfers({
+  account: 'example.near',
+  limit: 20
+});
+```
+
+### Filter by Collection
+
+Track transfers within a specific NFT collection:
+
+```typescript
+const collectionTransfers = await sdk.transfers.listNftTransfers({
+  contract_id: 'paras-token-v2.near',
+  limit: 50
+});
+```
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `limit` | `number` | No | Number of results to return (default: 50, max: 100) |
+| `offset` | `number` | No | Number of results to skip for pagination |
+| `account` | `string` | No | Filter by account ID (sender or receiver) |
+| `contract_id` | `string` | No | Filter by NFT contract ID |
+
+## Response Structures
+
+### FT Transfer Response
+
+The API returns a paginated response with the following structure:
+
+```typescript
+{
+  data: Array<{
+    receipt_id: string;               // Receipt identifier
+    block_timestamp: string;          // ISO 8601 timestamp
+    block_height: number;             // Block where transfer occurred
+    contract_id: string;              // Token contract ID
+    from_account_id: string;          // Sender's account
+    to_account_id: string;            // Receiver's account
+    amount: string;                   // Amount transferred (in smallest unit)
+    token_ids: null;                  // Always null for FT transfers
+    memo: string | null;              // Optional transfer memo
+  }>;
+  total: number;                      // Total number of matching transfers
+  limit: number;                      // Number of results per page
+  offset: number;                     // Current offset
+}
+```
+
+### Example FT Transfer Response
+
+```json
+{
+  "data": [
+    {
+      "receipt_id": "3xECr8ziMCk1AcAVNxtPCn8CMZJuz3ZCxFc3rJnNivtS",
+      "block_timestamp": "2026-01-01T20:57:29.641844Z",
+      "block_height": 179321914,
+      "contract_id": "wallet.kaiching",
+      "from_account_id": "earn.kaiching",
+      "to_account_id": "ffo8qmkqls33.users.kaiching",
+      "amount": "350",
+      "token_ids": null,
+      "memo": "sws:04973f7a87f7e967449fb0d50346b028a7e3d6a9b1d9e1a21b21d4cbe3d2d541,T-e7ecd-oe006-2026-01-01"
+    }
+  ],
+  "total": 1,
+  "limit": 1,
+  "offset": 0
+}
+```
+
+### NFT Transfer Response
+
+The API returns a paginated response with the following structure:
+
+```typescript
+{
+  data: Array<{
+    receipt_id: string;               // Receipt identifier
+    block_timestamp: string;          // ISO 8601 timestamp
+    block_height: number;             // Block where transfer occurred
+    contract_id: string;              // NFT contract ID
+    from_account_id: string;          // Sender's account (or null for mints)
+    to_account_id: string;            // Receiver's account
+    amount: null;                     // Always null for NFT transfers
+    token_ids: string[];              // Array of transferred NFT token IDs
+    memo: string | null;              // Optional transfer memo
+  }>;
+  total: number;                      // Total number of matching transfers
+  limit: number;                      // Number of results per page
+  offset: number;                     // Current offset
+}
+```
+
+### Example NFT Transfer Response
+
+```json
+{
+  "data": [
+    {
+      "receipt_id": "B6L9TVJRtFxNo4SJiqb4YMWE1GWU3BWvaBrshtsxbrLX",
+      "block_timestamp": "2026-01-01T20:48:07.065265Z",
+      "block_height": 179320994,
+      "contract_id": "claimable-rewards.near",
+      "from_account_id": "subject-muu.near",
+      "to_account_id": "claimable-rewards.near",
+      "amount": null,
+      "token_ids": ["subject-muu.near"],
+      "memo": null
+    }
+  ],
+  "total": 1,
+  "limit": 1,
+  "offset": 0
+}
+```
+
+<Callout type="info">
+Both FT and NFT transfer endpoints return paginated responses with `data`, `total`, `limit`, and `offset` fields. Always access the transfers via `response.data`.
+</Callout>
+
+## Use Cases
+
+### Token Portfolio Tracker
+
+Build a complete token portfolio for an account:
+
+```typescript
+async function getTokenPortfolio(accountId: string) {
+  // Get all FT transfers for the account
+  const response = await sdk.transfers.listFtTransfers({
+    account: accountId,
+    limit: 100
+  });
+  
+  const transfers = response.data;
+  
+  // Calculate net balance per token
+  const balances = new Map<string, bigint>();
+  
+  for (const transfer of transfers) {
+    const amount = BigInt(transfer.amount);
+    const current = balances.get(transfer.contract_id) || 0n;
+    
+    if (transfer.to_account_id === accountId) {
+      balances.set(transfer.contract_id, current + amount);
+    } else if (transfer.from_account_id === accountId) {
+      balances.set(transfer.contract_id, current - amount);
+    }
+  }
+  
+  return Object.fromEntries(balances);
+}
+
+const portfolio = await getTokenPortfolio('example.near');
+console.log(portfolio);
+```
+
+### NFT Collection Analyzer
+
+Analyze trading activity for an NFT collection:
+
+```typescript
+async function analyzeNFTCollection(contractId: string) {
+  const response = await sdk.transfers.listNftTransfers({
+    contract_id: contractId,
+    limit: 100
+  });
+  
+  const transfers = response.data;
+  
+  const uniqueTraders = new Set([
+    ...transfers.map(t => t.from_account_id),
+    ...transfers.map(t => t.to_account_id)
+  ].filter(Boolean));
+  
+  const mintCount = transfers.filter(t => !t.from_account_id).length;
+  const tradeCount = transfers.filter(t => t.from_account_id).length;
+  
+  return {
+    totalTransfers: response.total,
+    uniqueTraders: uniqueTraders.size,
+    mints: mintCount,
+    trades: tradeCount,
+    mostRecentTransfer: transfers[0]
+  };
+}
+
+const analysis = await analyzeNFTCollection('paras-token-v2.near');
+console.log(analysis);
+```
+
+### Transfer Timeline
+
+Create a chronological timeline of token movements:
+
+```typescript
+async function getTransferTimeline(accountId: string) {
+  const [ftResponse, nftResponse] = await Promise.all([
+    sdk.transfers.listFtTransfers({ account: accountId, limit: 50 }),
+    sdk.transfers.listNftTransfers({ account: accountId, limit: 50 })
+  ]);
+  
+  const allTransfers = [
+    ...ftResponse.data.map(t => ({ ...t, type: 'FT' })),
+    ...nftResponse.data.map(t => ({ ...t, type: 'NFT' }))
+  ];
+  
+  // Sort by timestamp (newest first)
+  allTransfers.sort((a, b) => 
+    new Date(b.block_timestamp).getTime() - 
+    new Date(a.block_timestamp).getTime()
+  );
+  
+  return allTransfers;
+}
+
+const timeline = await getTransferTimeline('example.near');
+timeline.forEach(transfer => {
+  const date = new Date(transfer.block_timestamp).toLocaleString();
+  const id = transfer.type === 'NFT' 
+    ? transfer.token_ids[0] 
+    : transfer.contract_id;
+  console.log(`[${transfer.type}] ${date}: ${id}`);
+});
+```
+
+### Token Velocity
+
+Calculate how frequently a token changes hands:
+
+```typescript
+async function calculateTokenVelocity(tokenId: string, hours: number = 24) {
+  const stats = await sdk.stats.getNetworkStats();
+  const latestBlock = stats.latest_block_height;
+  
+  // Approximate blocks in the time period (NEAR: ~1.3s per block)
+  const blocksPerHour = Math.floor(3600 / 1.3);
+  const blocksToAnalyze = blocksPerHour * hours;
+  
+  const response = await sdk.transfers.listFtTransfers({
+    token_id: tokenId,
+    limit: 100
+  });
+  
+  const transfers = response.data;
+  
+  // Filter to recent blocks
+  const recentTransfers = transfers.filter(
+    t => t.block_height >= (latestBlock - blocksToAnalyze)
+  );
+  
+  const totalVolume = recentTransfers.reduce(
+    (sum, t) => sum + BigInt(t.amount), 
+    0n
+  );
+  
+  return {
+    transferCount: recentTransfers.length,
+    totalVolume: totalVolume.toString(),
+    transfersPerHour: (recentTransfers.length / hours).toFixed(2),
+    avgTransferSize: (totalVolume / BigInt(recentTransfers.length || 1)).toString()
+  };
+}
+
+const velocity = await calculateTokenVelocity('usdc.near', 24);
+console.log(velocity);
+```
+
+### Top Token Receivers
+
+Find accounts receiving the most of a specific token:
+
+```typescript
+async function getTopReceivers(tokenId: string, limit: number = 10) {
+  let allTransfers = [];
+  let offset = 0;
+  const batchSize = 100;
+  
+  // Fetch all recent transfers
+  while (offset < 1000) {
+    const response = await sdk.transfers.listFtTransfers({
+      token_id: tokenId,
+      limit: batchSize,
+      offset
+    });
+    
+    if (response.data.length === 0) break;
+    allTransfers.push(...response.data);
+    offset += batchSize;
+  }
+  
+  // Aggregate by receiver
+  const receiverTotals = new Map<string, bigint>();
+  
+  for (const transfer of allTransfers) {
+    const receiver = transfer.to_account_id;
+    const amount = BigInt(transfer.amount);
+    const current = receiverTotals.get(receiver) || 0n;
+    receiverTotals.set(receiver, current + amount);
+  }
+  
+  // Sort and limit
+  return Array.from(receiverTotals.entries())
+    .sort((a, b) => Number(b[1] - a[1]))
+    .slice(0, limit)
+    .map(([account, amount]) => ({
+      account,
+      totalReceived: amount.toString()
+    }));
+}
+
+const topReceivers = await getTopReceivers('usdc.near', 10);
+topReceivers.forEach((r, i) => {
+  console.log(`${i + 1}. ${r.account}: ${r.totalReceived}`);
+});
+```
+
+### NFT Ownership History
+
+Track the complete ownership history of a specific NFT:
+
+```typescript
+async function getNFTHistory(contractId: string, tokenId: string) {
+  const allTransfers = [];
+  let offset = 0;
+  
+  while (true) {
+    const response = await sdk.transfers.listNftTransfers({
+      contract_id: contractId,
+      limit: 100,
+      offset
+    });
+    
+    if (response.data.length === 0) break;
+    
+    // Filter for this specific token
+    const tokenTransfers = response.data.filter(t => 
+      t.token_ids.includes(tokenId)
+    );
+    allTransfers.push(...tokenTransfers);
+    
+    if (response.data.length < 100) break;
+    offset += 100;
+  }
+  
+  // Sort chronologically (oldest first)
+  allTransfers.sort((a, b) => a.block_height - b.block_height);
+  
+  return allTransfers.map((transfer, index) => ({
+    transferNumber: index + 1,
+    timestamp: new Date(transfer.block_timestamp).toLocaleString(),
+    from: transfer.from_account_id || 'MINTED',
+    to: transfer.to_account_id,
+    receiptId: transfer.receipt_id
+  }));
+}
+
+const history = await getNFTHistory('paras-token-v2.near', '12345:1');
+console.log('NFT Ownership History:');
+history.forEach(h => {
+  console.log(`${h.transferNumber}. ${h.from} → ${h.to} (${h.timestamp})`);
+});
+```
+
+## Understanding Transfer Data
+
+### Amount Format
+
+FT transfer amounts are stored as strings in their smallest unit (similar to wei in Ethereum):
+
+```typescript
+// If token has 6 decimals (like USDC)
+const amount = '1000000'; // represents 1.000000 USDC
+
+// Convert to decimal
+function formatAmount(amount: string, decimals: number): string {
+  const value = BigInt(amount);
+  const divisor = BigInt(10 ** decimals);
+  return (Number(value) / Number(divisor)).toFixed(decimals);
+}
+
+const usdc = formatAmount('1000000', 6);
+console.log(usdc); // "1.000000"
+```
+
+### NFT Token IDs
+
+NFT token IDs follow the format `{series_id}:{token_number}` or just a simple ID:
+
+```typescript
+// Paras format: "12345:1" (series 12345, token 1)
+// Simple format: "1" or "abc123"
+```
+
+### Minting vs Trading
+
+NFT transfers where `from_account_id` is `null` represent minting events:
+
+```typescript
+const response = await sdk.transfers.listNftTransfers({ limit: 100 });
+const transfers = response.data;
+
+const mints = transfers.filter(t => !t.from_account_id);
+const trades = transfers.filter(t => t.from_account_id);
+
+console.log(`Mints: ${mints.length}, Trades: ${trades.length}`);
+```
+
+### Memo Field
+
+The optional `memo` field can contain additional context about the transfer:
+
+```typescript
+const response = await sdk.transfers.listFtTransfers({ limit: 1 });
+const transfer = response.data[0];
+
+if (transfer.memo) {
+  console.log(`Transfer memo: ${transfer.memo}`);
+  // Example: "Payment for services", "Airdrop", "Refund", etc.
+  // Or structured data: "sws:04973f7a...,T-e7ecd-oe006-2026-01-01"
+}
+```
+
+## Best Practices
+
+### Pagination for Large Datasets
+
+<Callout type="tip">
+Always implement pagination when fetching transfer histories for active accounts or popular tokens.
+</Callout>
+
+```typescript
+async function* paginateTransfers(params: any, type: 'ft' | 'nft' = 'ft') {
+  let offset = 0;
+  const limit = 100;
+  
+  while (true) {
+    const response = type === 'ft'
+      ? await sdk.transfers.listFtTransfers({ ...params, limit, offset })
+      : await sdk.transfers.listNftTransfers({ ...params, limit, offset });
+    
+    if (response.data.length === 0) break;
+    
+    yield response.data;
+    
+    if (response.data.length < limit) break;
+    offset += limit;
+  }
+}
+
+// Usage
+for await (const batch of paginateTransfers({ account: 'example.near' }, 'ft')) {
+  console.log(`Processing ${batch.length} FT transfers`);
+  // Process batch
+}
+```
+
+### Handling Large Numbers
+
+<Callout type="warning">
+Always use `BigInt` for token amounts to avoid precision loss with large numbers.
+</Callout>
+
+```typescript
+// ❌ Incorrect - loses precision
+const amount = Number('999999999999999999999999');
+
+// ✅ Correct - preserves precision
+const amount = BigInt('999999999999999999999999');
+```
+
+### Efficient Multi-Account Queries
+
+When querying multiple accounts, batch the requests:
+
+```typescript
+async function getMultiAccountTransfers(accounts: string[]) {
+  const results = await Promise.all(
+    accounts.map(account =>
+      sdk.transfers.listFtTransfers({ account, limit: 50 })
+    )
+  );
+  
+  return accounts.reduce((acc, account, index) => {
+    acc[account] = results[index].data;
+    return acc;
+  }, {} as Record<string, any[]>);
+}
+
+const transfers = await getMultiAccountTransfers(['alice.near', 'bob.near']);
+```
+
+For support: [support@shadowcorp.dev](mailto:support@shadowcorp.dev)

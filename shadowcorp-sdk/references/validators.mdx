@@ -1,0 +1,659 @@
+---
+title: "Validators"
+description: "Access information about NEAR validators and staking pools. Query active validators, their stakes, pool details, fees, and delegator counts to make informed staking decisions."
+icon: users
+---
+
+import { Callout } from '@/components/ui/callout'
+
+## List All Validators
+
+Retrieve a list of all currently active validators on the NEAR network.
+
+```typescript
+import { ShadowCorpSDK } from 'shadowcorp';
+
+const sdk = new ShadowCorpSDK('your-api-key');
+
+const validators = await sdk.validators.listAll();
+console.log(validators);
+```
+
+### Response Structure
+
+```typescript
+{
+  current_validators: Array<{
+    account_id: string;               // Validator pool account ID
+    stake: string;                    // Total stake amount (yoctoNEAR)
+    is_slashed: boolean;              // Whether validator has been slashed
+  }>;
+  epoch_height: number;               // Current epoch number
+  epoch_start_height: number;         // Block height where epoch started
+}
+```
+
+### Example Response
+
+```json
+{
+  "current_validators": [
+    {
+      "account_id": "bisontrails2.poolv1.near",
+      "stake": "31443694397391879798613647676853",
+      "is_slashed": false
+    },
+    {
+      "account_id": "astro-stakers.poolv1.near",
+      "stake": "26247324012358739392463595129522",
+      "is_slashed": false
+    },
+    {
+      "account_id": "shadowcorp.pool.near",
+      "stake": "74568895254823223771018781554",
+      "is_slashed": false
+    }
+  ],
+  "epoch_height": 3929,
+  "epoch_start_height": 179553123
+}
+```
+
+### Error Handling
+
+```typescript
+try {
+  const validators = await sdk.validators.listAll();
+  console.log(`Found ${validators.current_validators.length} validators`);
+} catch (error) {
+  console.error('Failed to fetch validators:', error);
+}
+```
+
+## Get Pool Information
+
+Retrieve detailed information about a specific validator pool.
+
+```typescript
+const pool = await sdk.validators.getPoolInfo('shadowcorp.pool.near');
+console.log(pool);
+```
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `poolId` | `string` | Yes | Validator pool identifier (e.g., 'pool.near') |
+
+### Response Structure
+
+```typescript
+{
+  pool_id: string;                    // Pool account identifier
+  total_staked: string;               // Total stake in pool (yoctoNEAR)
+  fee_percentage: number;             // Pool commission fee (0-100)
+  owner_id: string;                   // Pool owner account
+  num_delegators: number;             // Number of delegators
+}
+```
+
+### Example Response
+
+```json
+{
+  "pool_id": "shadowcorp.pool.near",
+  "total_staked": "74571890529373657505710417269",
+  "fee_percentage": 5.0,
+  "owner_id": "shadowcorp.near",
+  "num_delegators": 20
+}
+```
+
+### Error Handling
+
+```typescript
+try {
+  const pool = await sdk.validators.getPoolInfo('unknown.pool.near');
+} catch (error) {
+  if (error.message.includes('not found')) {
+    console.log('Pool does not exist');
+  } else {
+    console.error('Query failed:', error);
+  }
+}
+```
+
+## Understanding Validator Data
+
+### Stake Amount
+
+Validator stakes are in yoctoNEAR (1 NEAR = 10²⁴ yoctoNEAR):
+
+```typescript
+function formatNEAR(yoctoNEAR: string): string {
+  const amount = BigInt(yoctoNEAR);
+  const divisor = BigInt('1000000000000000000000000');
+  const whole = amount / divisor;
+  const fraction = amount % divisor;
+  const fractionStr = fraction.toString().padStart(24, '0').substring(0, 4);
+  return `${whole}.${fractionStr}`;
+}
+
+const validators = await sdk.validators.listAll();
+validators.current_validators.forEach(v => {
+  console.log(`${v.account_id}: ${formatNEAR(v.stake)} NEAR`);
+});
+```
+
+### Slashing Status
+
+The `is_slashed` flag indicates if a validator has been penalized for misbehavior:
+
+```typescript
+const validators = await sdk.validators.listAll();
+
+const slashed = validators.current_validators.filter(v => v.is_slashed);
+const active = validators.current_validators.filter(v => !v.is_slashed);
+
+console.log(`Active: ${active.length}, Slashed: ${slashed.length}`);
+```
+
+### Epoch Information
+
+NEAR operates in epochs (approximately 12 hours each):
+
+```typescript
+const validators = await sdk.validators.listAll();
+
+console.log(`Current Epoch: ${validators.epoch_height}`);
+console.log(`Epoch started at block: ${validators.epoch_start_height}`);
+```
+
+### Pool Fees
+
+Pool commission fees are expressed as percentages (0-100):
+
+```typescript
+const pool = await sdk.validators.getPoolInfo('pool.near');
+
+console.log(`Pool fee: ${pool.fee_percentage}%`);
+
+// Calculate take-home percentage for delegators
+const delegatorShare = 100 - pool.fee_percentage;
+console.log(`Delegators receive: ${delegatorShare}% of rewards`);
+```
+
+## Use Cases
+
+### Validator Ranking
+
+Rank validators by total stake:
+
+```typescript
+async function rankValidatorsByStake() {
+  const validators = await sdk.validators.listAll();
+  
+  const ranked = validators.current_validators
+    .filter(v => !v.is_slashed)
+    .sort((a, b) => {
+      const stakeA = BigInt(a.stake);
+      const stakeB = BigInt(b.stake);
+      return stakeB > stakeA ? 1 : stakeB < stakeA ? -1 : 0;
+    })
+    .slice(0, 10)
+    .map((v, index) => ({
+      rank: index + 1,
+      validator: v.account_id,
+      stake: formatNEAR(v.stake)
+    }));
+  
+  return ranked;
+}
+
+const topValidators = await rankValidatorsByStake();
+console.log('Top 10 Validators by Stake:');
+console.table(topValidators);
+```
+
+### Pool Comparison
+
+Compare multiple validator pools:
+
+```typescript
+async function comparePools(poolIds: string[]) {
+  const pools = await Promise.allSettled(
+    poolIds.map(id => sdk.validators.getPoolInfo(id))
+  );
+  
+  return poolIds.map((poolId, index) => {
+    const result = pools[index];
+    
+    if (result.status === 'fulfilled') {
+      const pool = result.value;
+      return {
+        pool: pool.pool_id,
+        stake: formatNEAR(pool.total_staked),
+        fee: `${pool.fee_percentage}%`,
+        delegators: pool.num_delegators,
+        exists: true
+      };
+    } else {
+      return {
+        pool: poolId,
+        stake: '0',
+        fee: 'N/A',
+        delegators: 0,
+        exists: false
+      };
+    }
+  });
+}
+
+const comparison = await comparePools([
+  'shadowcorp.pool.near',
+  'zavodil.poolv1.near',
+  'staked.poolv1.near'
+]);
+
+console.table(comparison);
+```
+
+### Lowest Fee Finder
+
+Find validators with the lowest fees:
+
+```typescript
+async function findLowestFeePools(maxFee: number = 5) {
+  const validators = await sdk.validators.listAll();
+  
+  // Get pool info for all validators (in batches to avoid rate limits)
+  const batchSize = 10;
+  const poolInfos = [];
+  
+  for (let i = 0; i < validators.current_validators.length; i += batchSize) {
+    const batch = validators.current_validators.slice(i, i + batchSize);
+    const results = await Promise.allSettled(
+      batch.map(v => sdk.validators.getPoolInfo(v.account_id))
+    );
+    
+    results.forEach(result => {
+      if (result.status === 'fulfilled') {
+        poolInfos.push(result.value);
+      }
+    });
+  }
+  
+  // Filter by fee and sort
+  const lowFeePools = poolInfos
+    .filter(pool => pool.fee_percentage <= maxFee)
+    .sort((a, b) => a.fee_percentage - b.fee_percentage)
+    .slice(0, 10)
+    .map(pool => ({
+      pool: pool.pool_id,
+      fee: `${pool.fee_percentage}%`,
+      stake: formatNEAR(pool.total_staked),
+      delegators: pool.num_delegators
+    }));
+  
+  return lowFeePools;
+}
+
+const lowFeePools = await findLowestFeePools(5);
+console.log('Validators with ≤5% fee:');
+console.table(lowFeePools);
+```
+
+### Decentralization Score
+
+Calculate network decentralization based on stake distribution:
+
+```typescript
+async function calculateDecentralization() {
+  const validators = await sdk.validators.listAll();
+  
+  const totalStake = validators.current_validators.reduce(
+    (sum, v) => sum + BigInt(v.stake),
+    0n
+  );
+  
+  // Calculate stake concentration in top validators
+  const sorted = validators.current_validators
+    .sort((a, b) => {
+      const stakeA = BigInt(a.stake);
+      const stakeB = BigInt(b.stake);
+      return stakeB > stakeA ? 1 : -1;
+    });
+  
+  const top10Stake = sorted.slice(0, 10).reduce(
+    (sum, v) => sum + BigInt(v.stake),
+    0n
+  );
+  
+  const top33Stake = sorted.slice(0, 33).reduce(
+    (sum, v) => sum + BigInt(v.stake),
+    0n
+  );
+  
+  const top10Percentage = (Number(top10Stake) / Number(totalStake)) * 100;
+  const top33Percentage = (Number(top33Stake) / Number(totalStake)) * 100;
+  
+  return {
+    totalValidators: validators.current_validators.length,
+    totalStake: formatNEAR(totalStake.toString()),
+    concentration: {
+      top10: `${top10Percentage.toFixed(2)}%`,
+      top33: `${top33Percentage.toFixed(2)}%`
+    },
+    nakamotoCoefficient: sorted.findIndex((v, i, arr) => {
+      const cumulativeStake = arr.slice(0, i + 1).reduce(
+        (sum, val) => sum + BigInt(val.stake),
+        0n
+      );
+      return Number(cumulativeStake) / Number(totalStake) > 0.33;
+    }) + 1
+  };
+}
+
+const decentralization = await calculateDecentralization();
+console.log('Network Decentralization:');
+console.log(decentralization);
+```
+
+### Validator Health Check
+
+Monitor validator health and status:
+
+```typescript
+async function checkValidatorHealth(poolId: string) {
+  const [validators, poolInfo] = await Promise.all([
+    sdk.validators.listAll(),
+    sdk.validators.getPoolInfo(poolId)
+  ]);
+  
+  const validator = validators.current_validators.find(
+    v => v.account_id === poolId
+  );
+  
+  if (!validator) {
+    return {
+      isActive: false,
+      status: 'Not in validator set'
+    };
+  }
+  
+  const stake = BigInt(validator.stake);
+  const minStake = BigInt('10000000000000000000000000000'); // 10k NEAR threshold
+  
+  return {
+    isActive: true,
+    isSlashed: validator.is_slashed,
+    stake: formatNEAR(validator.stake),
+    fee: `${poolInfo.fee_percentage}%`,
+    delegators: poolInfo.num_delegators,
+    meetsMinStake: stake >= minStake,
+    status: validator.is_slashed ? 'Slashed' : 'Healthy'
+  };
+}
+
+const health = await checkValidatorHealth('shadowcorp.pool.near');
+console.log('Validator Health:', health);
+```
+
+### Delegator Distribution Analyzer
+
+Analyze delegator distribution across pools:
+
+```typescript
+async function analyzeDelegatorDistribution() {
+  const validators = await sdk.validators.listAll();
+  
+  // Get pool info for sample of validators
+  const sampleSize = 50;
+  const sample = validators.current_validators.slice(0, sampleSize);
+  
+  const poolInfos = await Promise.allSettled(
+    sample.map(v => sdk.validators.getPoolInfo(v.account_id))
+  );
+  
+  const validPools = poolInfos
+    .filter(r => r.status === 'fulfilled')
+    .map(r => r.value);
+  
+  const totalDelegators = validPools.reduce(
+    (sum, pool) => sum + pool.num_delegators,
+    0
+  );
+  
+  const avgDelegators = totalDelegators / validPools.length;
+  
+  const sorted = validPools.sort((a, b) => b.num_delegators - a.num_delegators);
+  
+  return {
+    totalDelegators,
+    avgDelegators: avgDelegators.toFixed(0),
+    maxDelegators: sorted[0].num_delegators,
+    maxDelegatorsPool: sorted[0].pool_id,
+    minDelegators: sorted[sorted.length - 1].num_delegators,
+    distribution: sorted.slice(0, 10).map(pool => ({
+      pool: pool.pool_id,
+      delegators: pool.num_delegators
+    }))
+  };
+}
+
+const distribution = await analyzeDelegatorDistribution();
+console.log('Delegator Distribution:', distribution);
+```
+
+### Staking Recommendations
+
+Generate personalized staking recommendations:
+
+```typescript
+async function getStakingRecommendations(
+  maxFee: number = 5,
+  minDelegators: number = 10
+) {
+  const validators = await sdk.validators.listAll();
+  
+  // Filter active, non-slashed validators
+  const candidates = validators.current_validators
+    .filter(v => !v.is_slashed)
+    .slice(0, 100); // Check first 100
+  
+  const poolInfos = await Promise.allSettled(
+    candidates.map(v => sdk.validators.getPoolInfo(v.account_id))
+  );
+  
+  const recommendations = [];
+  
+  for (let i = 0; i < poolInfos.length; i++) {
+    const result = poolInfos[i];
+    if (result.status === 'fulfilled') {
+      const pool = result.value;
+      
+      if (
+        pool.fee_percentage <= maxFee &&
+        pool.num_delegators >= minDelegators
+      ) {
+        const validator = candidates[i];
+        const stake = BigInt(validator.stake);
+        
+        recommendations.push({
+          pool: pool.pool_id,
+          fee: pool.fee_percentage,
+          delegators: pool.num_delegators,
+          stake: formatNEAR(validator.stake),
+          score: (100 - pool.fee_percentage) * Math.log(pool.num_delegators)
+        });
+      }
+    }
+  }
+  
+  // Sort by score (lower fee + more delegators = higher score)
+  return recommendations
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 10)
+    .map(({ score, ...rest }) => rest);
+}
+
+const recommendations = await getStakingRecommendations(5, 10);
+console.log('Top Staking Recommendations:');
+console.table(recommendations);
+```
+
+### Epoch Tracker
+
+Track epoch changes:
+
+```typescript
+class EpochTracker {
+  private lastEpoch: number | null = null;
+  
+  async track() {
+    const validators = await sdk.validators.listAll();
+    
+    if (this.lastEpoch && this.lastEpoch !== validators.epoch_height) {
+      console.log(`🔄 New epoch: ${validators.epoch_height}`);
+      console.log(`Started at block: ${validators.epoch_start_height}`);
+      console.log(`Active validators: ${validators.current_validators.length}`);
+    }
+    
+    this.lastEpoch = validators.epoch_height;
+    return validators;
+  }
+}
+
+const tracker = new EpochTracker();
+setInterval(() => tracker.track(), 60000); // Check every minute
+```
+
+## Understanding Pool Economics
+
+### Fee Impact on Returns
+
+Calculate how fees affect staking returns:
+
+```typescript
+async function calculateFeeImpact(
+  poolId: string,
+  annualAPY: number = 10
+) {
+  const pool = await sdk.validators.getPoolInfo(poolId);
+  
+  const grossReward = annualAPY;
+  const poolFee = (grossReward * pool.fee_percentage) / 100;
+  const netReward = grossReward - poolFee;
+  
+  return {
+    pool: pool.pool_id,
+    grossAPY: `${grossReward}%`,
+    poolFee: `${pool.fee_percentage}%`,
+    feeAmount: `${poolFee.toFixed(2)}%`,
+    netAPY: `${netReward.toFixed(2)}%`,
+    delegatorReturn: `${netReward.toFixed(2)}%`
+  };
+}
+
+const impact = await calculateFeeImpact('shadowcorp.pool.near', 10);
+console.log('Fee Impact Analysis:');
+console.log(impact);
+```
+
+### Minimum Stake Analysis
+
+Find validators with sufficient stake to be secure:
+
+```typescript
+async function findSecureValidators(minStakeNEAR: number = 10000) {
+  const validators = await sdk.validators.listAll();
+  
+  const minStakeYocto = BigInt(minStakeNEAR) * BigInt('1000000000000000000000000');
+  
+  const secure = validators.current_validators
+    .filter(v => !v.is_slashed && BigInt(v.stake) >= minStakeYocto)
+    .map(v => ({
+      validator: v.account_id,
+      stake: formatNEAR(v.stake)
+    }));
+  
+  return {
+    total: validators.current_validators.length,
+    secure: secure.length,
+    percentage: ((secure.length / validators.current_validators.length) * 100).toFixed(2) + '%',
+    validators: secure.slice(0, 20)
+  };
+}
+
+const secure = await findSecureValidators(10000);
+console.log(`${secure.secure}/${secure.total} validators (${secure.percentage}) have >10k NEAR stake`);
+```
+
+## Best Practices
+
+### Handle Large Validator Lists
+
+<Callout type="warning">
+There are 400+ active validators. Be mindful of rate limits when querying pool info for all validators.
+</Callout>
+
+```typescript
+async function batchGetPoolInfo(validatorIds: string[], batchSize: number = 10) {
+  const results = [];
+  
+  for (let i = 0; i < validatorIds.length; i += batchSize) {
+    const batch = validatorIds.slice(i, i + batchSize);
+    const poolInfos = await Promise.allSettled(
+      batch.map(id => sdk.validators.getPoolInfo(id))
+    );
+    
+    results.push(...poolInfos);
+    
+    // Optional: Add delay between batches
+    if (i + batchSize < validatorIds.length) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+  }
+  
+  return results;
+}
+```
+
+### Cache Validator Data
+
+Validator lists change slowly (every epoch ~12h), so caching is effective:
+
+```typescript
+class ValidatorCache {
+  private cache: any = null;
+  private timestamp: number = 0;
+  private ttl = 3600000; // 1 hour
+  
+  async get() {
+    if (this.cache && Date.now() - this.timestamp < this.ttl) {
+      return this.cache;
+    }
+    
+    this.cache = await sdk.validators.listAll();
+    this.timestamp = Date.now();
+    
+    return this.cache;
+  }
+}
+```
+
+### Use BigInt for Stake Calculations
+
+<Callout type="tip">
+Always use `BigInt` when comparing or calculating validator stakes to avoid precision loss.
+</Callout>
+
+```typescript
+// ❌ Incorrect - loses precision
+const stake = Number('31443694397391879798613647676853');
+
+// ✅ Correct - preserves precision
+const stake = BigInt('31443694397391879798613647676853');
+```
+
+For support: [support@shadowcorp.dev](mailto:support@shadowcorp.dev)

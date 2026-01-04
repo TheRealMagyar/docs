@@ -1,0 +1,617 @@
+---
+title: NFT Transfers
+description: Track NFT transfers across the NEAR blockchain with comprehensive filtering options. Monitor NFT movements, collection activity, and marketplace transactions in real-time.
+icon: images
+---
+
+import { Endpoint, Request } from '@mintlify/components';
+
+## List NFT Transfers
+
+<Endpoint method="GET" path="/v1/nft-transfers" />
+
+Retrieve a paginated list of NFT transfers with optional filtering by account, collection contract, or block height.
+
+<Info>
+  This endpoint tracks all NFT transfer events across the NEAR blockchain, including marketplace sales, direct transfers, and claims.
+</Info>
+
+### Query Parameters
+
+<ParamField query="limit" type="integer" default="50">
+  Number of NFT transfers to return per request. Maximum: 100.
+</ParamField>
+
+<ParamField query="offset" type="integer" default="0">
+  Number of transfers to skip for pagination.
+</ParamField>
+
+<ParamField query="account" type="string">
+  Filter transfers by account ID. Returns transfers where the account is either sender or receiver.
+</ParamField>
+
+<ParamField query="contract_id" type="string">
+  Filter transfers by NFT collection contract address (e.g., `asac.near`, `mintbase1.near`).
+</ParamField>
+
+<ParamField query="block_height" type="integer">
+  Filter transfers by specific block height.
+</ParamField>
+
+### Making Requests
+
+<Tabs>
+  <Tab title="cURL">
+    **All NFT transfers:**
+    ```bash
+    curl -H "X-API-Key: YOUR_KEY" \
+      "https://api.shadowcorp.dev/v1/nft-transfers?limit=50"
+    ```
+
+    **Filter by account:**
+    ```bash
+    curl -H "X-API-Key: YOUR_KEY" \
+      "https://api.shadowcorp.dev/v1/nft-transfers?account=example.near"
+    ```
+
+    **Filter by collection:**
+    ```bash
+    curl -H "X-API-Key: YOUR_KEY" \
+      "https://api.shadowcorp.dev/v1/nft-transfers?contract_id=asac.near"
+    ```
+
+    **Filter by block:**
+    ```bash
+    curl -H "X-API-Key: YOUR_KEY" \
+      "https://api.shadowcorp.dev/v1/nft-transfers?block_height=179320994"
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    // Get all NFT transfers with pagination
+    const getNFTTransfers = async (limit = 50, offset = 0) => {
+      const response = await fetch(
+        `https://api.shadowcorp.dev/v1/nft-transfers?limit=${limit}&offset=${offset}`,
+        {
+          headers: {
+            'X-API-Key': 'YOUR_KEY'
+          }
+        }
+      );
+      return await response.json();
+    };
+
+    // Filter by account
+    const getAccountNFTTransfers = async (accountId) => {
+      const response = await fetch(
+        `https://api.shadowcorp.dev/v1/nft-transfers?account=${accountId}`,
+        {
+          headers: {
+            'X-API-Key': 'YOUR_KEY'
+          }
+        }
+      );
+      return await response.json();
+    };
+
+    // Filter by collection contract
+    const getCollectionTransfers = async (contractId) => {
+      const response = await fetch(
+        `https://api.shadowcorp.dev/v1/nft-transfers?contract_id=${contractId}`,
+        {
+          headers: {
+            'X-API-Key': 'YOUR_KEY'
+          }
+        }
+      );
+      return await response.json();
+    };
+
+    // Filter by block height
+    const getBlockNFTTransfers = async (blockHeight) => {
+      const response = await fetch(
+        `https://api.shadowcorp.dev/v1/nft-transfers?block_height=${blockHeight}`,
+        {
+          headers: {
+            'X-API-Key': 'YOUR_KEY'
+          }
+        }
+      );
+      return await response.json();
+    };
+
+    // Usage
+    const transfers = await getNFTTransfers(10);
+    const userNFTs = await getAccountNFTTransfers('example.near');
+    const collectionActivity = await getCollectionTransfers('asac.near');
+    ```
+  </Tab>
+  
+  <Tab title="Python">
+    ```python
+    import requests
+
+    class NFTTransferAPI:
+        def __init__(self, api_key):
+            self.base_url = 'https://api.shadowcorp.dev'
+            self.headers = {'X-API-Key': api_key}
+        
+        def get_nft_transfers(self, limit=50, offset=0):
+            """Get all NFT transfers with pagination"""
+            params = {'limit': limit, 'offset': offset}
+            response = requests.get(
+                f'{self.base_url}/v1/nft-transfers',
+                headers=self.headers,
+                params=params
+            )
+            return response.json()
+        
+        def get_account_nft_transfers(self, account_id):
+            """Get NFT transfers for specific account"""
+            params = {'account': account_id}
+            response = requests.get(
+                f'{self.base_url}/v1/nft-transfers',
+                headers=self.headers,
+                params=params
+            )
+            return response.json()
+        
+        def get_collection_transfers(self, contract_id):
+            """Get transfers for specific NFT collection"""
+            params = {'contract_id': contract_id}
+            response = requests.get(
+                f'{self.base_url}/v1/nft-transfers',
+                headers=self.headers,
+                params=params
+            )
+            return response.json()
+        
+        def get_block_nft_transfers(self, block_height):
+            """Get NFT transfers in specific block"""
+            params = {'block_height': block_height}
+            response = requests.get(
+                f'{self.base_url}/v1/nft-transfers',
+                headers=self.headers,
+                params=params
+            )
+            return response.json()
+
+    # Usage
+    api = NFTTransferAPI('YOUR_KEY')
+    transfers = api.get_nft_transfers(limit=10)
+    user_nfts = api.get_account_nft_transfers('example.near')
+    collection = api.get_collection_transfers('asac.near')
+    ```
+  </Tab>
+  
+  <Tab title="Go">
+    ```go
+    package main
+
+    import (
+        "encoding/json"
+        "fmt"
+        "net/http"
+        "net/url"
+    )
+
+    type NFTTransferClient struct {
+        BaseURL string
+        APIKey  string
+        Client  *http.Client
+    }
+
+    func NewNFTTransferClient(apiKey string) *NFTTransferClient {
+        return &NFTTransferClient{
+            BaseURL: "https://api.shadowcorp.dev",
+            APIKey:  apiKey,
+            Client:  &http.Client{},
+        }
+    }
+
+    func (c *NFTTransferClient) GetNFTTransfers(limit, offset int) (map[string]interface{}, error) {
+        params := url.Values{}
+        params.Add("limit", fmt.Sprintf("%d", limit))
+        params.Add("offset", fmt.Sprintf("%d", offset))
+        
+        return c.makeRequest("/v1/nft-transfers", params)
+    }
+
+    func (c *NFTTransferClient) GetAccountNFTTransfers(accountID string) (map[string]interface{}, error) {
+        params := url.Values{}
+        params.Add("account", accountID)
+        
+        return c.makeRequest("/v1/nft-transfers", params)
+    }
+
+    func (c *NFTTransferClient) GetCollectionTransfers(contractID string) (map[string]interface{}, error) {
+        params := url.Values{}
+        params.Add("contract_id", contractID)
+        
+        return c.makeRequest("/v1/nft-transfers", params)
+    }
+
+    func (c *NFTTransferClient) makeRequest(path string, params url.Values) (map[string]interface{}, error) {
+        reqURL := fmt.Sprintf("%s%s?%s", c.BaseURL, path, params.Encode())
+        
+        req, err := http.NewRequest("GET", reqURL, nil)
+        if err != nil {
+            return nil, err
+        }
+        
+        req.Header.Add("X-API-Key", c.APIKey)
+        
+        resp, err := c.Client.Do(req)
+        if err != nil {
+            return nil, err
+        }
+        defer resp.Body.Close()
+
+        var result map[string]interface{}
+        json.NewDecoder(resp.Body).Decode(&result)
+        return result, nil
+    }
+
+    func main() {
+        client := NewNFTTransferClient("YOUR_KEY")
+        result, _ := client.GetNFTTransfers(10, 0)
+        fmt.Println("NFT Transfers:", result)
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Response Format
+
+<ResponseField name="data" type="array" required>
+  Array of NFT transfer objects.
+  
+  <Expandable title="NFT Transfer Object">
+    <ResponseField name="receipt_id" type="string">
+      Unique receipt identifier for this transfer event.
+    </ResponseField>
+    
+    <ResponseField name="block_timestamp" type="string">
+      ISO 8601 timestamp when the transfer occurred.
+    </ResponseField>
+    
+    <ResponseField name="block_height" type="integer">
+      The block height where this transfer was included.
+    </ResponseField>
+    
+    <ResponseField name="contract_id" type="string">
+      NFT collection contract address.
+    </ResponseField>
+    
+    <ResponseField name="from_account_id" type="string">
+      Account ID that sent the NFT (null for mints).
+    </ResponseField>
+    
+    <ResponseField name="to_account_id" type="string">
+      Account ID that received the NFT (null for burns).
+    </ResponseField>
+    
+    <ResponseField name="amount" type="string">
+      Sale amount in NEAR tokens (null for non-marketplace transfers).
+    </ResponseField>
+    
+    <ResponseField name="token_ids" type="array">
+      Array of token IDs transferred in this event. Can contain multiple tokens in batch transfers.
+    </ResponseField>
+    
+    <ResponseField name="memo" type="string">
+      Optional memo or note attached to the transfer.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="total" type="integer" required>
+  Total number of NFT transfers matching the query (useful for pagination).
+</ResponseField>
+
+<ResponseField name="limit" type="integer" required>
+  Number of transfers returned in this response.
+</ResponseField>
+
+<ResponseField name="offset" type="integer" required>
+  Current pagination offset.
+</ResponseField>
+
+### Success Response (200 OK)
+
+```json
+{
+  "data": [
+    {
+      "receipt_id": "B6L9TVJRtFxNo4SJiqb4YMWE1GWU3BWvaBrshtsxbrLX",
+      "block_timestamp": "2026-01-01T20:48:07.065265Z",
+      "block_height": 179320994,
+      "contract_id": "claimable-rewards.near",
+      "from_account_id": "subject-muu.near",
+      "to_account_id": "claimable-rewards.near",
+      "amount": null,
+      "token_ids": ["subject-muu.near"],
+      "memo": null
+    }
+  ],
+  "total": 1,
+  "limit": 1,
+  "offset": 0
+}
+```
+
+<Check>
+  A `200 OK` status code with the `data` array indicates success. Check the `total` field to see how many transfers match your query.
+</Check>
+
+## Understanding NFT Transfer Fields
+
+<AccordionGroup>
+  <Accordion title="Receipt ID vs Token ID" icon="fingerprint">
+    The `receipt_id` is a unique identifier for the transfer transaction itself, while `token_ids` contains the actual NFT identifiers being transferred.
+    
+    - **Receipt ID**: Use this to track the specific transfer event on the blockchain
+    - **Token IDs**: Use these to identify which NFTs were moved in the transfer
+    
+    A single receipt can contain multiple token IDs in batch transfers.
+  </Accordion>
+  
+  <Accordion title="Transfer Types" icon="arrows-turn-right">
+    NFT transfers can represent different types of operations:
+    
+    - **Regular Transfer**: Both `from_account_id` and `to_account_id` are present
+    - **Mint**: `from_account_id` is null (NFT was created)
+    - **Burn**: `to_account_id` is null (NFT was destroyed)
+    - **Marketplace Sale**: `amount` field contains the sale price
+    - **Claim/Reward**: Often seen with reward contracts like `claimable-rewards.near`
+    
+    <Tip>
+      Check the `amount` field to distinguish marketplace sales from regular transfers.
+    </Tip>
+  </Accordion>
+  
+  <Accordion title="Collection Activity Tracking" icon="chart-line">
+    Monitor NFT collection activity by filtering on `contract_id`:
+    
+    ```javascript
+    async function getCollectionStats(contractId) {
+      let offset = 0;
+      const limit = 100;
+      let totalVolume = 0;
+      let salesCount = 0;
+      
+      while (true) {
+        const response = await fetch(
+          `https://api.shadowcorp.dev/v1/nft-transfers?contract_id=${contractId}&limit=${limit}&offset=${offset}`,
+          { headers: { 'X-API-Key': 'YOUR_KEY' } }
+        );
+        const data = await response.json();
+        
+        // Calculate sales volume
+        data.data.forEach(transfer => {
+          if (transfer.amount) {
+            totalVolume += parseFloat(transfer.amount);
+            salesCount++;
+          }
+        });
+        
+        if (offset + limit >= data.total) break;
+        offset += limit;
+      }
+      
+      return {
+        totalVolume: totalVolume.toFixed(2),
+        salesCount,
+        avgPrice: (totalVolume / salesCount).toFixed(2)
+      };
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Batch Transfers" icon="layer-group">
+    Some NFT transfers involve multiple tokens in a single transaction. The `token_ids` array will contain all tokens transferred:
+    
+    ```json
+    {
+      "receipt_id": "...",
+      "token_ids": ["token1.asac.near", "token2.asac.near", "token3.asac.near"],
+      "from_account_id": "seller.near",
+      "to_account_id": "buyer.near"
+    }
+    ```
+    
+    Always check the array length to handle batch transfers correctly in your application.
+  </Accordion>
+</AccordionGroup>
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="NFT Portfolio Tracking" icon="wallet" color="#3b82f6">
+    Track all NFT movements for user wallets and build complete NFT portfolio views.
+  </Card>
+  
+  <Card title="Collection Analytics" icon="chart-mixed" color="#8b5cf6">
+    Analyze collection activity, sales volume, and holder distribution over time.
+  </Card>
+  
+  <Card title="Marketplace Integration" icon="store" color="#10b981">
+    Monitor marketplace sales and integrate real-time NFT trading data.
+  </Card>
+  
+  <Card title="Rarity Tracking" icon="gem" color="#f59e0b">
+    Track specific rare tokens and alert on transfers or sales.
+  </Card>
+</CardGroup>
+
+## Advanced Example: NFT Collection Monitor
+
+Here's a complete example of an NFT collection monitoring system:
+
+```javascript
+class NFTCollectionMonitor {
+  constructor(apiKey) {
+    this.apiKey = apiKey;
+    this.baseUrl = 'https://api.shadowcorp.dev';
+    this.collections = new Map();
+  }
+
+  async monitorCollection(contractId, callback) {
+    console.log(`📊 Starting monitor for collection: ${contractId}`);
+    
+    // Initial fetch to get current state
+    const initial = await this.getCollectionTransfers(contractId, 1);
+    const lastHeight = initial.data[0]?.block_height || 0;
+    
+    this.collections.set(contractId, {
+      lastHeight,
+      callback,
+      stats: { transfers: 0, sales: 0, volume: 0 }
+    });
+    
+    // Poll every 15 seconds
+    setInterval(async () => {
+      await this.checkNewTransfers(contractId);
+    }, 15000);
+  }
+
+  async checkNewTransfers(contractId) {
+    try {
+      const collection = this.collections.get(contractId);
+      const response = await this.getCollectionTransfers(contractId, 50);
+      
+      // Filter for new transfers
+      const newTransfers = response.data.filter(
+        transfer => transfer.block_height > collection.lastHeight
+      );
+      
+      if (newTransfers.length > 0) {
+        console.log(`🆕 Found ${newTransfers.length} new transfer(s) for ${contractId}`);
+        
+        // Update stats
+        newTransfers.forEach(transfer => {
+          collection.stats.transfers++;
+          if (transfer.amount) {
+            collection.stats.sales++;
+            collection.stats.volume += parseFloat(transfer.amount || 0);
+          }
+        });
+        
+        // Update last checked height
+        collection.lastHeight = Math.max(
+          ...newTransfers.map(t => t.block_height)
+        );
+        
+        // Call callback for each new transfer
+        newTransfers.forEach(transfer => collection.callback(transfer, collection.stats));
+      }
+    } catch (error) {
+      console.error('Error checking NFT transfers:', error);
+    }
+  }
+
+  async getCollectionTransfers(contractId, limit) {
+    const response = await fetch(
+      `${this.baseUrl}/v1/nft-transfers?contract_id=${contractId}&limit=${limit}`,
+      {
+        headers: { 'X-API-Key': this.apiKey }
+      }
+    );
+    return await response.json();
+  }
+
+  getStats(contractId) {
+    return this.collections.get(contractId)?.stats;
+  }
+}
+
+// Usage
+const monitor = new NFTCollectionMonitor('YOUR_KEY');
+
+monitor.monitorCollection('asac.near', (transfer, stats) => {
+  console.log('New NFT transfer detected:');
+  console.log(`  Receipt: ${transfer.receipt_id}`);
+  console.log(`  From: ${transfer.from_account_id}`);
+  console.log(`  To: ${transfer.to_account_id}`);
+  console.log(`  Tokens: ${transfer.token_ids.join(', ')}`);
+  
+  if (transfer.amount) {
+    console.log(`  💰 Sale Price: ${transfer.amount} NEAR`);
+  }
+  
+  console.log(`\n📈 Collection Stats:`);
+  console.log(`  Total Transfers: ${stats.transfers}`);
+  console.log(`  Total Sales: ${stats.sales}`);
+  console.log(`  Volume: ${stats.volume.toFixed(2)} NEAR`);
+});
+```
+
+## Error Responses
+
+### 400 Bad Request
+
+```json
+{
+  "error": "Invalid query parameters",
+  "code": 400
+}
+```
+
+<Warning>
+  Check that your `limit` does not exceed 100 and `offset` is a positive integer.
+</Warning>
+
+### 401 Unauthorized
+
+```json
+{
+  "error": "Missing or invalid API key",
+  "code": 401
+}
+```
+
+### 404 Not Found
+
+```json
+{
+  "error": "No transfers found",
+  "code": 404
+}
+```
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+  <Card 
+    title="FT Transfers" 
+    icon="coins" 
+    href="/shadow-api/endpoints/ft-transfers"
+  >
+    Track fungible token transfers on NEAR
+  </Card>
+  
+  <Card 
+    title="NFT Metadata" 
+    icon="file-image" 
+    href="/shadow-api/endpoints/nfts"
+  >
+    Get detailed NFT collection metadata
+  </Card>
+  
+  <Card 
+    title="Account Data" 
+    icon="user" 
+    href="/shadow-api/endpoints/full-account-data"
+  >
+    View complete account information including NFT holdings
+  </Card>
+  
+  <Card 
+    title="Transactions" 
+    icon="swap" 
+    href="/shadow-api/endpoints/transactions"
+  >
+    Full transaction details including NFT transfers
+  </Card>
+</CardGroup>

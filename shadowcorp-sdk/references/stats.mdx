@@ -1,0 +1,201 @@
+---
+title: "Network Statistics"
+description: "Retrieve real-time NEAR blockchain statistics and metrics"
+icon: line-chart
+---
+
+import { Callout } from '@/components/ui/callout'
+
+# Network Statistics
+
+Get a comprehensive overview of the NEAR blockchain with real-time statistics including the latest block height, total transactions, and token transfer counts.
+
+## Get Network Stats
+
+Retrieve current network statistics in a single call:
+
+```typescript
+import { ShadowCorpSDK } from 'shadowcorp';
+
+const sdk = new ShadowCorpSDK('your-api-key');
+
+const stats = await sdk.stats.getNetworkStats();
+console.log(stats);
+```
+
+**Response:**
+
+```json
+{
+  "latest_block_height": 179321914,
+  "latest_block_timestamp": "2026-01-01T20:57:29.641844Z",
+  "total_transactions": 12158292,
+  "total_ft_transfers": 14649624,
+  "total_nft_transfers": 11031
+}
+```
+
+## Response Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `latest_block_height` | `number` | The most recent block height processed by the indexer |
+| `latest_block_timestamp` | `string` | ISO 8601 timestamp of the latest block |
+| `total_transactions` | `number` | Cumulative count of all transactions on the network |
+| `total_ft_transfers` | `number` | Total number of fungible token (FT) transfers |
+| `total_nft_transfers` | `number` | Total number of non-fungible token (NFT) transfers |
+
+<Callout type="info">
+Statistics are updated in real-time as new blocks are processed. The `latest_block_timestamp` indicates the freshness of the data.
+</Callout>
+
+## Use Cases
+
+### Monitor Network Activity
+
+Track blockchain growth over time:
+
+```typescript
+async function trackGrowth() {
+  const stats = await sdk.stats.getNetworkStats();
+  
+  console.log(`Current block: ${stats.latest_block_height}`);
+  console.log(`Total transactions: ${stats.total_transactions.toLocaleString()}`);
+  console.log(`FT transfers: ${stats.total_ft_transfers.toLocaleString()}`);
+  console.log(`NFT transfers: ${stats.total_nft_transfers.toLocaleString()}`);
+}
+```
+
+### Calculate Activity Rates
+
+Determine transaction rates and network throughput:
+
+```typescript
+async function calculateRates() {
+  const stats1 = await sdk.stats.getNetworkStats();
+  
+  // Wait 60 seconds
+  await new Promise(resolve => setTimeout(resolve, 60000));
+  
+  const stats2 = await sdk.stats.getNetworkStats();
+  
+  const blocksPerMinute = stats2.latest_block_height - stats1.latest_block_height;
+  const txPerMinute = stats2.total_transactions - stats1.total_transactions;
+  
+  console.log(`Blocks/min: ${blocksPerMinute}`);
+  console.log(`Transactions/min: ${txPerMinute}`);
+  console.log(`TPS (est): ${(txPerMinute / 60).toFixed(2)}`);
+}
+```
+
+### Data Freshness Check
+
+Verify the indexer is up-to-date:
+
+```typescript
+async function checkFreshness() {
+  const stats = await sdk.stats.getNetworkStats();
+  const latestTime = new Date(stats.latest_block_timestamp);
+  const now = new Date();
+  const lagSeconds = (now - latestTime) / 1000;
+  
+  if (lagSeconds > 300) {
+    console.warn(`Indexer lag detected: ${lagSeconds.toFixed(0)}s behind`);
+  } else {
+    console.log(`Indexer is up-to-date (lag: ${lagSeconds.toFixed(0)}s)`);
+  }
+}
+```
+
+### Dashboard Display
+
+Create a real-time dashboard:
+
+```typescript
+async function displayDashboard() {
+  const stats = await sdk.stats.getNetworkStats();
+  
+  const dashboard = {
+    network: {
+      currentBlock: stats.latest_block_height.toLocaleString(),
+      lastUpdated: new Date(stats.latest_block_timestamp).toLocaleString(),
+    },
+    activity: {
+      totalTransactions: stats.total_transactions.toLocaleString(),
+      ftTransfers: stats.total_ft_transfers.toLocaleString(),
+      nftTransfers: stats.total_nft_transfers.toLocaleString(),
+    },
+    ratios: {
+      ftPerTransaction: (stats.total_ft_transfers / stats.total_transactions).toFixed(2),
+      nftPerTransaction: (stats.total_nft_transfers / stats.total_transactions).toFixed(4),
+    }
+  };
+  
+  console.log(dashboard);
+}
+```
+
+## Understanding the Data
+
+### Block Height
+
+The `latest_block_height` represents the most recent block that has been fully processed and indexed. NEAR produces blocks approximately every 1-2 seconds.
+
+### Transaction vs Transfer Counts
+
+- **Transactions**: All on-chain transactions including smart contract calls, account creation, and token operations
+- **FT Transfers**: Specific fungible token transfer events (following NEP-141 standard)
+- **NFT Transfers**: Non-fungible token transfer events (following NEP-171 standard)
+
+Note that a single transaction may contain multiple FT or NFT transfers, which is why transfer counts can exceed transaction counts.
+
+### Timestamp Format
+
+All timestamps follow ISO 8601 format with UTC timezone (`YYYY-MM-DDTHH:mm:ss.ffffffZ`). Parse them using standard date libraries:
+
+```typescript
+const stats = await sdk.stats.getNetworkStats();
+const timestamp = new Date(stats.latest_block_timestamp);
+
+console.log(timestamp.toISOString());
+console.log(timestamp.toLocaleString());
+console.log(timestamp.getTime()); // Unix milliseconds
+```
+
+## Best Practices
+
+<Callout type="warning">
+Avoid polling this endpoint too frequently. For real-time monitoring, poll every 5-10 seconds at most. For analytics dashboards, once per minute is typically sufficient.
+</Callout>
+
+### Efficient Polling
+
+```typescript
+class NetworkMonitor {
+  private lastStats: any = null;
+  
+  async poll() {
+    const stats = await sdk.stats.getNetworkStats();
+    
+    if (this.lastStats) {
+      const newBlocks = stats.latest_block_height - this.lastStats.latest_block_height;
+      const newTxs = stats.total_transactions - this.lastStats.total_transactions;
+      
+      if (newBlocks > 0) {
+        console.log(`+${newBlocks} blocks, +${newTxs} transactions`);
+      }
+    }
+    
+    this.lastStats = stats;
+  }
+  
+  start(intervalMs = 10000) {
+    setInterval(() => this.poll(), intervalMs);
+  }
+}
+
+const monitor = new NetworkMonitor();
+monitor.start(); // Poll every 10 seconds
+```
+
+For support: [support@shadowcorp.dev](mailto:support@shadowcorp.dev)

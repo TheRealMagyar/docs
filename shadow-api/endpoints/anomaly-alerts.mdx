@@ -1,0 +1,1490 @@
+---
+title: Anomaly Alerts
+description: Monitor and analyze suspicious activity on the NEAR blockchain. Access real-time security alerts, anomaly detection, and forensic intelligence for risk assessment and fraud prevention.
+icon: triangle-exclamation
+---
+
+import { Endpoint, Request } from '@mintlify/components';
+
+## Get Anomaly Alerts
+
+<Endpoint method="GET" path="/v1/alerts" />
+
+Retrieve security alerts triggered by anomalous blockchain activity. The system continuously monitors transactions and account behavior to detect suspicious patterns, high-risk activities, and potential security threats.
+
+<Warning>
+  This endpoint returns high-priority security intelligence. Alerts should be reviewed promptly, especially those marked with "high" severity.
+</Warning>
+
+### Query Parameters
+
+<ParamField query="account" type="string">
+  Filter alerts by the triggering account ID. Returns only alerts where the specified account triggered the anomaly detection system.
+  
+  **Examples:**
+  - `relay.tg` - Filter alerts for relay.tg account
+  - `aurora` - Filter alerts for Aurora bridge
+  - `suspicious.near` - Check alerts for a specific account
+</ParamField>
+
+<ParamField query="severity" type="string">
+  Filter alerts by severity level. Valid values: `high`, `medium`, `low`.
+  
+  **Default:** Returns all severity levels if not specified.
+</ParamField>
+
+<ParamField query="status" type="string">
+  Filter alerts by status. Valid values: `new`, `investigating`, `resolved`, `false_positive`.
+  
+  **Default:** `new` (only unresolved alerts)
+</ParamField>
+
+<ParamField query="limit" type="integer">
+  Maximum number of alerts to return per request.
+  
+  **Default:** 50  
+  **Maximum:** 100
+</ParamField>
+
+<ParamField query="offset" type="integer">
+  Number of alerts to skip for pagination.
+  
+  **Default:** 0
+</ParamField>
+
+### Making Requests
+
+<Tabs>
+  <Tab title="cURL">
+    **Get recent alerts:**
+    ```bash
+    curl -H "X-API-Key: YOUR_KEY" \
+      "https://api.shadowcorp.dev/v1/alerts?limit=20"
+    ```
+
+    **Filter by account:**
+    ```bash
+    curl -H "X-API-Key: YOUR_KEY" \
+      "https://api.shadowcorp.dev/v1/alerts?account=relay.tg"
+    ```
+
+    **Filter by severity:**
+    ```bash
+    curl -H "X-API-Key: YOUR_KEY" \
+      "https://api.shadowcorp.dev/v1/alerts?severity=high&limit=50"
+    ```
+
+    **Multiple filters:**
+    ```bash
+    curl -H "X-API-Key: YOUR_KEY" \
+      "https://api.shadowcorp.dev/v1/alerts?severity=high&status=new&limit=100"
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    // Get recent alerts
+    const getAlerts = async (params = {}) => {
+      const queryParams = new URLSearchParams({
+        limit: params.limit || 50,
+        offset: params.offset || 0,
+        ...(params.account && { account: params.account }),
+        ...(params.severity && { severity: params.severity }),
+        ...(params.status && { status: params.status })
+      });
+
+      const response = await fetch(
+        `https://api.shadowcorp.dev/v1/alerts?${queryParams}`,
+        {
+          headers: {
+            'X-API-Key': 'YOUR_KEY'
+          }
+        }
+      );
+      return await response.json();
+    };
+
+    // Get all alerts
+    const allAlerts = await getAlerts({ limit: 100 });
+    console.log(`Total alerts: ${allAlerts.total}`);
+    console.log(`Retrieved: ${allAlerts.data.length}`);
+
+    // Filter by account
+    const accountAlerts = await getAlerts({ 
+      account: 'relay.tg',
+      severity: 'high'
+    });
+
+    // Pagination example
+    const getAlertsPage = async (page = 0, pageSize = 50) => {
+      return await getAlerts({
+        limit: pageSize,
+        offset: page * pageSize
+      });
+    };
+
+    const firstPage = await getAlertsPage(0);
+    const secondPage = await getAlertsPage(1);
+    ```
+  </Tab>
+  
+  <Tab title="Python">
+    ```python
+    import requests
+    from typing import Optional, List, Dict
+    from datetime import datetime
+
+    class AlertsAPI:
+        def __init__(self, api_key: str):
+            self.base_url = 'https://api.shadowcorp.dev'
+            self.headers = {'X-API-Key': api_key}
+        
+        def get_alerts(
+            self,
+            account: Optional[str] = None,
+            severity: Optional[str] = None,
+            status: Optional[str] = None,
+            limit: int = 50,
+            offset: int = 0
+        ) -> Dict:
+            """Get anomaly alerts with optional filters"""
+            params = {
+                'limit': limit,
+                'offset': offset
+            }
+            
+            if account:
+                params['account'] = account
+            if severity:
+                params['severity'] = severity
+            if status:
+                params['status'] = status
+            
+            response = requests.get(
+                f'{self.base_url}/v1/alerts',
+                headers=self.headers,
+                params=params
+            )
+            return response.json()
+        
+        def get_high_severity_alerts(self, limit: int = 100) -> List[Dict]:
+            """Get only high severity alerts"""
+            result = self.get_alerts(severity='high', limit=limit)
+            return result.get('data', [])
+        
+        def get_alerts_by_account(self, account: str) -> List[Dict]:
+            """Get all alerts for a specific account"""
+            result = self.get_alerts(account=account, limit=100)
+            return result.get('data', [])
+        
+        def get_all_alerts(self, max_alerts: int = 1000) -> List[Dict]:
+            """Fetch all alerts using pagination"""
+            all_alerts = []
+            offset = 0
+            limit = 100
+            
+            while len(all_alerts) < max_alerts:
+                result = self.get_alerts(limit=limit, offset=offset)
+                data = result.get('data', [])
+                
+                if not data:
+                    break
+                
+                all_alerts.extend(data)
+                offset += limit
+                
+                if len(data) < limit:
+                    break
+            
+            return all_alerts[:max_alerts]
+        
+        def group_by_severity(self, alerts: List[Dict]) -> Dict:
+            """Group alerts by severity level"""
+            groups = {'high': [], 'medium': [], 'low': []}
+            
+            for alert in alerts:
+                severity = alert.get('severity', 'low')
+                if severity in groups:
+                    groups[severity].append(alert)
+            
+            return groups
+
+    # Usage
+    api = AlertsAPI('YOUR_KEY')
+    
+    # Get recent alerts
+    result = api.get_alerts(limit=20)
+    print(f"Total alerts in system: {result['total']}")
+    
+    for alert in result['data']:
+        print(f"[{alert['severity'].upper()}] {alert['triggering_account']}")
+    
+    # Get high severity only
+    high_alerts = api.get_high_severity_alerts()
+    print(f"High severity alerts: {len(high_alerts)}")
+    
+    # Account-specific alerts
+    relay_alerts = api.get_alerts_by_account('relay.tg')
+    print(f"Alerts for relay.tg: {len(relay_alerts)}")
+    
+    # Group by severity
+    all_alerts = api.get_all_alerts(max_alerts=500)
+    grouped = api.group_by_severity(all_alerts)
+    print(f"High: {len(grouped['high'])}, Medium: {len(grouped['medium'])}, Low: {len(grouped['low'])}")
+    ```
+  </Tab>
+  
+  <Tab title="Go">
+    ```go
+    package main
+
+    import (
+        "encoding/json"
+        "fmt"
+        "net/http"
+        "net/url"
+        "strconv"
+    )
+
+    type AlertsClient struct {
+        BaseURL string
+        APIKey  string
+        Client  *http.Client
+    }
+
+    type Alert struct {
+        AlertID           int    `json:"alert_id"`
+        TriggeredAt       string `json:"triggered_at"`
+        BlockHeight       int64  `json:"block_height"`
+        TriggeringAccount string `json:"triggering_account"`
+        Severity          string `json:"severity"`
+        Status            string `json:"status"`
+    }
+
+    type AlertsResponse struct {
+        Data   []Alert `json:"data"`
+        Total  int     `json:"total"`
+        Limit  int     `json:"limit"`
+        Offset int     `json:"offset"`
+    }
+
+    type AlertsParams struct {
+        Account  string
+        Severity string
+        Status   string
+        Limit    int
+        Offset   int
+    }
+
+    func NewAlertsClient(apiKey string) *AlertsClient {
+        return &AlertsClient{
+            BaseURL: "https://api.shadowcorp.dev",
+            APIKey:  apiKey,
+            Client:  &http.Client{},
+        }
+    }
+
+    func (c *AlertsClient) GetAlerts(params AlertsParams) (*AlertsResponse, error) {
+        reqURL := fmt.Sprintf("%s/v1/alerts", c.BaseURL)
+        
+        // Build query parameters
+        query := url.Values{}
+        if params.Account != "" {
+            query.Add("account", params.Account)
+        }
+        if params.Severity != "" {
+            query.Add("severity", params.Severity)
+        }
+        if params.Status != "" {
+            query.Add("status", params.Status)
+        }
+        if params.Limit > 0 {
+            query.Add("limit", strconv.Itoa(params.Limit))
+        }
+        if params.Offset > 0 {
+            query.Add("offset", strconv.Itoa(params.Offset))
+        }
+        
+        if len(query) > 0 {
+            reqURL += "?" + query.Encode()
+        }
+        
+        req, err := http.NewRequest("GET", reqURL, nil)
+        if err != nil {
+            return nil, err
+        }
+        
+        req.Header.Add("X-API-Key", c.APIKey)
+        
+        resp, err := c.Client.Do(req)
+        if err != nil {
+            return nil, err
+        }
+        defer resp.Body.Close()
+
+        var alertsResp AlertsResponse
+        if err := json.NewDecoder(resp.Body).Decode(&alertsResp); err != nil {
+            return nil, err
+        }
+        
+        return &alertsResp, nil
+    }
+
+    func (c *AlertsClient) GetHighSeverityAlerts(limit int) ([]Alert, error) {
+        resp, err := c.GetAlerts(AlertsParams{
+            Severity: "high",
+            Limit:    limit,
+        })
+        if err != nil {
+            return nil, err
+        }
+        return resp.Data, nil
+    }
+
+    func (c *AlertsClient) GetAlertsByAccount(account string) ([]Alert, error) {
+        resp, err := c.GetAlerts(AlertsParams{
+            Account: account,
+            Limit:   100,
+        })
+        if err != nil {
+            return nil, err
+        }
+        return resp.Data, nil
+    }
+
+    func main() {
+        client := NewAlertsClient("YOUR_KEY")
+        
+        // Get recent alerts
+        alerts, err := client.GetAlerts(AlertsParams{
+            Limit: 20,
+        })
+        if err != nil {
+            panic(err)
+        }
+        
+        fmt.Printf("Total alerts: %d\n", alerts.Total)
+        fmt.Printf("Retrieved: %d alerts\n", len(alerts.Data))
+        
+        // Get high severity alerts
+        highAlerts, err := client.GetHighSeverityAlerts(50)
+        if err != nil {
+            panic(err)
+        }
+        
+        fmt.Printf("\nHigh severity alerts: %d\n", len(highAlerts))
+        for _, alert := range highAlerts {
+            fmt.Printf("[HIGH] Alert #%d: %s at block %d\n",
+                alert.AlertID, alert.TriggeringAccount, alert.BlockHeight)
+        }
+        
+        // Account-specific alerts
+        accountAlerts, err := client.GetAlertsByAccount("relay.tg")
+        if err != nil {
+            panic(err)
+        }
+        
+        fmt.Printf("\nAlerts for relay.tg: %d\n", len(accountAlerts))
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Response Format
+
+<ResponseField name="data" type="array" required>
+  Array of alert objects containing anomaly detection results.
+</ResponseField>
+
+<ResponseField name="total" type="integer" required>
+  Total number of alerts matching the query filters (across all pages).
+</ResponseField>
+
+<ResponseField name="limit" type="integer" required>
+  Maximum number of alerts returned in this response.
+</ResponseField>
+
+<ResponseField name="offset" type="integer" required>
+  Number of alerts skipped (for pagination).
+</ResponseField>
+
+#### Alert Object Fields
+
+<ResponseField name="alert_id" type="integer" required>
+  Unique identifier for this alert.
+</ResponseField>
+
+<ResponseField name="triggered_at" type="string" required>
+  ISO 8601 timestamp when the alert was triggered.
+</ResponseField>
+
+<ResponseField name="block_height" type="integer" required>
+  NEAR blockchain block height where the anomaly was detected.
+</ResponseField>
+
+<ResponseField name="triggering_account" type="string" required>
+  The NEAR account ID that triggered the anomaly detection. Can be an account name (e.g., `relay.tg`) or a transaction hash for system-level alerts.
+</ResponseField>
+
+<ResponseField name="severity" type="string" required>
+  Alert severity level: `high`, `medium`, or `low`.
+  
+  - **high**: Critical security threat, requires immediate attention
+  - **medium**: Suspicious activity, should be investigated
+  - **low**: Minor anomaly, informational only
+</ResponseField>
+
+<ResponseField name="status" type="string" required>
+  Current alert status: `new`, `investigating`, `resolved`, or `false_positive`.
+</ResponseField>
+
+### Success Response (200 OK)
+
+```json
+{
+  "data": [
+    {
+      "alert_id": 1424587,
+      "triggered_at": "2026-01-03T18:20:21.819056Z",
+      "block_height": 147835574,
+      "triggering_account": "relay.tg",
+      "severity": "high",
+      "status": "new"
+    },
+    {
+      "alert_id": 1424586,
+      "triggered_at": "2026-01-03T18:20:21.584401Z",
+      "block_height": 147835574,
+      "triggering_account": "system",
+      "severity": "medium",
+      "status": "new"
+    },
+    {
+      "alert_id": 1424585,
+      "triggered_at": "2026-01-03T18:20:21.383334Z",
+      "block_height": 147835574,
+      "triggering_account": "relay.tg",
+      "severity": "high",
+      "status": "new"
+    }
+  ],
+  "total": 1424587,
+  "limit": 50,
+  "offset": 0
+}
+```
+
+<Check>
+  A `200 OK` status code indicates alerts were retrieved successfully. The `total` field shows the complete number of alerts in the system.
+</Check>
+
+## Understanding Alert Severity
+
+<AccordionGroup>
+  <Accordion title="High Severity Alerts" icon="circle-exclamation" iconType="solid">
+    **High severity alerts indicate critical security threats that require immediate attention:**
+    
+    - Unusual transaction volumes or patterns
+    - Rapid fund movements suggesting money laundering
+    - Multiple failed authorization attempts
+    - Known malicious contract interactions
+    - Suspicious cross-chain bridge activity
+    - Potential exploit attempts
+    
+    **Response actions:**
+    ```javascript
+    const handleHighSeverityAlert = (alert) => {
+      // Immediate actions for high severity
+      console.log(`🚨 CRITICAL ALERT #${alert.alert_id}`);
+      console.log(`Account: ${alert.triggering_account}`);
+      console.log(`Block: ${alert.block_height}`);
+      
+      // 1. Flag account for review
+      // 2. Increase monitoring frequency
+      // 3. Notify security team
+      // 4. Consider automatic risk scoring increase
+    };
+    ```
+    
+    <Warning>
+      High severity alerts should be investigated within 15 minutes of detection.
+    </Warning>
+  </Accordion>
+  
+  <Accordion title="Medium Severity Alerts" icon="circle-exclamation">
+    **Medium severity alerts indicate suspicious activity that warrants investigation:**
+    
+    - Unusual but not critical transaction patterns
+    - Account behavior changes
+    - Smart contract interactions with elevated risk
+    - Moderate volume anomalies
+    - Failed transactions above threshold
+    
+    **Investigation workflow:**
+    ```javascript
+    const investigateMediumAlert = async (alert) => {
+      console.log(`⚠️ Medium Alert #${alert.alert_id}`);
+      
+      // 1. Fetch account history
+      const history = await getAccountTransactions(
+        alert.triggering_account
+      );
+      
+      // 2. Check for patterns
+      const patterns = analyzePatterns(history);
+      
+      // 3. Cross-reference with known risks
+      const riskScore = await checkRiskDatabase(
+        alert.triggering_account
+      );
+      
+      // 4. Determine if escalation needed
+      if (riskScore > 70) {
+        escalateToHigh(alert);
+      }
+    };
+    ```
+    
+    <Info>
+      Medium alerts should be reviewed within 1 hour of detection.
+    </Info>
+  </Accordion>
+  
+  <Accordion title="Low Severity Alerts" icon="circle-info">
+    **Low severity alerts are informational and indicate minor anomalies:**
+    
+    - Small deviations from normal behavior
+    - Single unusual transaction
+    - Non-critical pattern changes
+    - Informational system events
+    
+    These alerts are useful for:
+    - Building behavioral baselines
+    - Trend analysis
+    - Long-term pattern detection
+    - Research and analytics
+    
+    ```javascript
+    const processLowAlert = (alert) => {
+      // Log for analytics
+      logAlertForAnalytics(alert);
+      
+      // Update behavioral models
+      updateBaselineModels(alert.triggering_account);
+      
+      // No immediate action required
+      console.log(`ℹ️ Info: Alert #${alert.alert_id} logged`);
+    };
+    ```
+  </Accordion>
+  
+  <Accordion title="System Alerts" icon="computer">
+    **System alerts are triggered by network-wide anomalies:**
+    
+    When `triggering_account` is `"system"`, the alert indicates:
+    - Network congestion or performance issues
+    - Block production anomalies
+    - Validator problems
+    - Protocol-level events
+    - Cross-chain bridge issues
+    
+    ```javascript
+    const isSystemAlert = (alert) => {
+      return alert.triggering_account === 'system';
+    };
+    
+    const handleSystemAlert = (alert) => {
+      if (isSystemAlert(alert)) {
+        console.log(`🖥️ System Alert: Block ${alert.block_height}`);
+        // Check network status
+        // Monitor validator performance
+        // Alert infrastructure team
+      }
+    };
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Security Monitoring" icon="shield-halved" color="#dc2626">
+    Real-time fraud detection and security monitoring for exchanges and wallets.
+  </Card>
+  
+  <Card title="Compliance Systems" icon="scale-balanced" color="#7c3aed">
+    AML/KYC compliance monitoring and suspicious activity reporting.
+  </Card>
+  
+  <Card title="Risk Assessment" icon="chart-line" color="#ea580c">
+    Dynamic risk scoring and account reputation management systems.
+  </Card>
+  
+  <Card title="Threat Intelligence" icon="brain" color="#0891b2">
+    Build threat intelligence platforms and security research tools.
+  </Card>
+</CardGroup>
+
+## Advanced Example: Alert Monitoring System
+
+Complete alert monitoring and analysis system:
+
+```javascript
+class AlertMonitoringSystem {
+  constructor(apiKey) {
+    this.apiKey = apiKey;
+    this.baseUrl = 'https://api.shadowcorp.dev';
+    this.alertCache = new Map();
+    this.watchlist = new Set();
+  }
+
+  async getAlerts(params = {}) {
+    const queryParams = new URLSearchParams({
+      limit: params.limit || 50,
+      offset: params.offset || 0,
+      ...(params.account && { account: params.account }),
+      ...(params.severity && { severity: params.severity }),
+      ...(params.status && { status: params.status })
+    });
+
+    const response = await fetch(
+      `${this.baseUrl}/v1/alerts?${queryParams}`,
+      {
+        headers: { 'X-API-Key': this.apiKey }
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch alerts: ${response.statusText}`);
+    }
+
+    return await response.json();
+  }
+
+  async getAllAlerts(maxAlerts = 1000) {
+    const allAlerts = [];
+    let offset = 0;
+    const limit = 100;
+
+    while (allAlerts.length < maxAlerts) {
+      const result = await this.getAlerts({ limit, offset });
+      
+      if (!result.data || result.data.length === 0) {
+        break;
+      }
+
+      allAlerts.push(...result.data);
+      offset += limit;
+
+      if (result.data.length < limit) {
+        break;
+      }
+
+      // Rate limiting
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    return allAlerts.slice(0, maxAlerts);
+  }
+
+  groupBySeverity(alerts) {
+    return {
+      high: alerts.filter(a => a.severity === 'high'),
+      medium: alerts.filter(a => a.severity === 'medium'),
+      low: alerts.filter(a => a.severity === 'low')
+    };
+  }
+
+  groupByAccount(alerts) {
+    const grouped = {};
+    
+    alerts.forEach(alert => {
+      const account = alert.triggering_account;
+      if (!grouped[account]) {
+        grouped[account] = [];
+      }
+      grouped[account].push(alert);
+    });
+
+    return grouped;
+  }
+
+  getMostAlertedAccounts(alerts, topN = 10) {
+    const accountCounts = {};
+    
+    alerts.forEach(alert => {
+      const account = alert.triggering_account;
+      accountCounts[account] = (accountCounts[account] || 0) + 1;
+    });
+
+    return Object.entries(accountCounts)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, topN)
+      .map(([account, count]) => ({ account, count }));
+  }
+
+  async analyzeAlertPatterns(timeWindowMinutes = 60) {
+    const alerts = await this.getAllAlerts();
+    const now = new Date();
+    const cutoff = new Date(now - timeWindowMinutes * 60 * 1000);
+
+    const recentAlerts = alerts.filter(alert => {
+      const alertTime = new Date(alert.triggered_at);
+      return alertTime >= cutoff;
+    });
+
+    const analysis = {
+      totalAlerts: alerts.length,
+      recentAlerts: recentAlerts.length,
+      timeWindow: `${timeWindowMinutes} minutes`,
+      severityBreakdown: this.groupBySeverity(recentAlerts),
+      topAccounts: this.getMostAlertedAccounts(recentAlerts, 5),
+      alertRate: (recentAlerts.length / timeWindowMinutes).toFixed(2)
+    };
+
+    return analysis;
+  }
+
+  addToWatchlist(account) {
+    this.watchlist.add(account);
+    console.log(`✅ Added ${account} to watchlist`);
+  }
+
+  removeFromWatchlist(account) {
+    this.watchlist.delete(account);
+    console.log(`❌ Removed ${account} from watchlist`);
+  }
+
+  async monitorWatchlist() {
+    if (this.watchlist.size === 0) {
+      console.log('⚠️ Watchlist is empty');
+      return [];
+    }
+
+    const watchlistAlerts = [];
+
+    for (const account of this.watchlist) {
+      try {
+        const result = await this.getAlerts({ 
+          account, 
+          status: 'new',
+          limit: 100 
+        });
+        
+        if (result.data.length > 0) {
+          watchlistAlerts.push({
+            account,
+            alerts: result.data,
+            count: result.data.length
+          });
+        }
+      } catch (error) {
+        console.error(`Error monitoring ${account}:`, error.message);
+      }
+    }
+
+    return watchlistAlerts;
+  }
+
+  async generateSecurityReport() {
+    console.log('\n' + '═'.repeat(80));
+    console.log('SECURITY ALERT REPORT');
+    console.log('═'.repeat(80));
+
+    const analysis = await this.analyzeAlertPatterns(60);
+
+    console.log(`\n📊 Alert Statistics (Last ${analysis.timeWindow}):`);
+    console.log(`  Total Alerts in System: ${analysis.totalAlerts.toLocaleString()}`);
+    console.log(`  Recent Alerts: ${analysis.recentAlerts}`);
+    console.log(`  Alert Rate: ${analysis.alertRate} alerts/minute`);
+
+    console.log(`\n⚠️ Severity Breakdown:`);
+    console.log(`  🔴 High: ${analysis.severityBreakdown.high.length}`);
+    console.log(`  🟡 Medium: ${analysis.severityBreakdown.medium.length}`);
+    console.log(`  🟢 Low: ${analysis.severityBreakdown.low.length}`);
+
+    console.log(`\n🎯 Top 5 Most Alerted Accounts:`);
+    analysis.topAccounts.forEach((item, index) => {
+      console.log(`  ${index + 1}. ${item.account}: ${item.count} alerts`);
+    });
+
+    // High severity details
+    if (analysis.severityBreakdown.high.length > 0) {
+      console.log(`\n🚨 Critical High Severity Alerts:`);
+      analysis.severityBreakdown.high.slice(0, 10).forEach(alert => {
+        console.log(`  Alert #${alert.alert_id}: ${alert.triggering_account} at block ${alert.block_height}`);
+      });
+    }
+
+    // Watchlist status
+    if (this.watchlist.size > 0) {
+      console.log(`\n👁️ Watchlist Status:`);
+      const watchlistAlerts = await this.monitorWatchlist();
+      
+      if (watchlistAlerts.length > 0) {
+        watchlistAlerts.forEach(item => {
+          console.log(`  ${item.account}: ${item.count} new alerts`);
+        });
+      } else {
+        console.log(`  No new alerts for watched accounts`);
+      }
+    }
+
+    console.log('\n' + '═'.repeat(80) + '\n');
+
+    return analysis;
+  }
+
+  async findAccountCorrelations(targetAccount, threshold = 3) {
+    // Find accounts that frequently appear in alerts with target account
+    const alerts = await this.getAllAlerts(500);
+    const targetAlerts = alerts.filter(
+      a => a.triggering_account === targetAccount
+    );
+
+    if (targetAlerts.length === 0) {
+      console.log(`No alerts found for ${targetAccount}`);
+      return [];
+    }
+
+    // Get block heights where target was alerted
+    const targetBlocks = new Set(
+      targetAlerts.map(a => a.block_height)
+    );
+
+    // Find other accounts alerted in same blocks
+    const correlations = {};
+    
+    alerts.forEach(alert => {
+      if (alert.triggering_account === targetAccount) return;
+      
+      if (targetBlocks.has(alert.block_height)) {
+        const account = alert.triggering_account;
+        correlations[account] = (correlations[account] || 0) + 1;
+      }
+    });
+
+    // Filter by threshold and sort
+    return Object.entries(correlations)
+      .filter(([, count]) => count >= threshold)
+      .sort(([, a], [, b]) => b - a)
+      .map(([account, count]) => ({ account, count }));
+  }
+
+  async detectAlertSpikes(windowMinutes = 10, spikeThreshold = 2.0) {
+    const alerts = await this.getAllAlerts();
+    const now = new Date();
+    
+    // Create time buckets
+    const buckets = {};
+    
+    alerts.forEach(alert => {
+      const alertTime = new Date(alert.triggered_at);
+      const minutesSinceNow = Math.floor((now - alertTime) / (60 * 1000));
+      const bucket = Math.floor(minutesSinceNow / windowMinutes);
+      
+      if (bucket < 10) { // Only look at last 10 windows
+        buckets[bucket] = (buckets[bucket] || 0) + 1;
+      }
+    });
+
+    // Calculate average
+    const values = Object.values(buckets);
+    const avg = values.reduce((a, b) => a + b, 0) / values.length;
+
+    // Find spikes
+    const spikes = Object.entries(buckets)
+      .filter(([, count]) => count > avg * spikeThreshold)
+      .map(([bucket, count]) => ({
+        windowStart: `${parseInt(bucket) * windowMinutes} min ago`,
+        count,
+        ratio: (count / avg).toFixed(2)
+      }));
+
+    return {
+      average: avg.toFixed(2),
+      spikes,
+      spikeDetected: spikes.length > 0
+    };
+  }
+}
+
+// Usage Examples
+const monitor = new AlertMonitoringSystem('YOUR_KEY');
+
+// Generate security report
+await monitor.generateSecurityReport();
+
+// Add accounts to watchlist
+monitor.addToWatchlist('relay.tg');
+monitor.addToWatchlist('aurora');
+monitor.addToWatchlist('sweat-relayer.near');
+
+// Monitor watchlist
+const watchlistAlerts = await monitor.monitorWatchlist();
+console.log('Watchlist alerts:', watchlistAlerts);
+
+// Find correlated accounts
+const correlations = await monitor.findAccountCorrelations('relay.tg', 5);
+console.log('Correlated accounts:', correlations);
+
+// Detect alert spikes
+const spikes = await monitor.detectAlertSpikes(10, 2.0);
+if (spikes.spikeDetected) {
+  console.log('⚠️ Alert spike detected!', spikes);
+}
+
+// Analyze patterns
+const analysis = await monitor.analyzeAlertPatterns(30);
+console.log(`Alert rate: ${analysis.alertRate} per minute`);
+```
+
+## Real-Time Alert Monitoring
+
+Implement continuous monitoring with polling:
+
+```javascript
+class RealTimeAlertMonitor {
+  constructor(apiKey, pollIntervalMs = 30000) {
+    this.apiKey = apiKey;
+    this.pollInterval = pollIntervalMs;
+    this.isMonitoring = false;
+    this.lastAlertId = null;
+    this.callbacks = [];
+  }
+
+  onNewAlert(callback) {
+    this.callbacks.push(callback);
+  }
+
+  async checkForNewAlerts() {
+    const monitor = new AlertMonitoringSystem(this.apiKey);
+    const result = await monitor.getAlerts({ 
+      limit: 50,
+      status: 'new'
+    });
+
+    if (!result.data || result.data.length === 0) {
+      return [];
+    }
+
+    // Get newest alert ID
+    const newestAlertId = Math.max(...result.data.map(a => a.alert_id));
+
+    // First run, just store the ID
+    if (this.lastAlertId === null) {
+      this.lastAlertId = newestAlertId;
+      return [];
+    }
+
+    // Find new alerts
+    const newAlerts = result.data.filter(
+      alert => alert.alert_id > this.lastAlertId
+    );
+
+    if (newAlerts.length > 0) {
+      this.lastAlertId = newestAlertId;
+      
+      // Trigger callbacks
+      this.callbacks.forEach(callback => {
+        newAlerts.forEach(alert => callback(alert));
+      });
+    }
+
+    return newAlerts;
+  }
+
+  async start() {
+    if (this.isMonitoring) {
+      console.log('⚠️ Already monitoring');
+      return;
+    }
+
+    this.isMonitoring = true;
+    console.log('🔄 Started real-time alert monitoring');
+
+    while (this.isMonitoring) {
+      try {
+        const newAlerts = await this.checkForNewAlerts();
+        
+        if (newAlerts.length > 0) {
+          console.log(`🔔 ${newAlerts.length} new alert(s) detected`);
+        }
+      } catch (error) {
+        console.error('Error checking alerts:', error.message);
+      }
+
+      await new Promise(resolve => setTimeout(resolve, this.pollInterval));
+    }
+  }
+
+  stop() {
+    this.isMonitoring = false;
+    console.log('⏹️ Stopped alert monitoring');
+  }
+}
+
+// Usage
+const realTimeMonitor = new RealTimeAlertMonitor('YOUR_KEY', 30000);
+
+// Set up alert handlers
+realTimeMonitor.onNewAlert((alert) => {
+  if (alert.severity === 'high') {
+    console.log(`🚨 HIGH ALERT: ${alert.triggering_account}`);
+    // Send notification, update dashboard, etc.
+  }
+});
+
+// Start monitoring
+realTimeMonitor.start();
+
+// Stop after some time
+setTimeout(() => {
+  realTimeMonitor.stop();
+}, 300000); // Stop after 5 minutes
+```
+
+## Error Responses
+
+### 400 Bad Request
+
+```json
+{
+  "error": "Invalid severity level. Must be: high, medium, or low",
+  "code": 400
+}
+```
+
+<Warning>
+  Ensure filter parameters use valid values: severity (`high`, `medium`, `low`) and status (`new`, `investigating`, `resolved`, `false_positive`).
+</Warning>
+
+### 401 Unauthorized
+
+```json
+{
+  "error": "Missing or invalid API key",
+  "code": 401
+}
+```
+
+### 404 Not Found
+
+```json
+{
+  "error": "No alerts found for account",
+  "code": 404,
+  "account": "nonexistent.near"
+}
+```
+
+<Note>
+  A 404 error when filtering by account means no alerts have been triggered for that specific account.
+</Note>
+
+### 429 Too Many Requests
+
+```json
+{
+  "error": "Rate limit exceeded",
+  "code": 429,
+  "retry_after": 60
+}
+```
+
+### 500 Internal Server Error
+
+```json
+{
+  "error": "Failed to fetch alerts",
+  "code": 500
+}
+```
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+  <Card 
+    title="Account Details" 
+    icon="user-circle" 
+    href="/shadow-api/endpoints/full-account-data"
+  >
+    Get full account information including risk scores
+  </Card>
+  
+  <Card 
+    title="Transactions" 
+    icon="swap" 
+    href="/shadow-api/endpoints/transactions"
+  >
+    View transaction details for alerted accounts
+  </Card>
+  
+  <Card 
+    title="Graph Queries" 
+    icon="network-wired" 
+    href="/shadow-api/endpoints/graph"
+  >
+    Analyze account relationships and fund flows
+  </Card>
+  
+  <Card 
+    title="Network Stats" 
+    icon="chart-line" 
+    href="/shadow-api/endpoints/stats"
+  >
+    View network-wide security metrics
+  </Card>
+</CardGroup>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Polling Strategy" icon="arrows-rotate">
+    Implement efficient polling to stay updated without overwhelming the API:
+    
+    ```javascript
+    class SmartPoller {
+      constructor(apiKey) {
+        this.apiKey = apiKey;
+        this.baseInterval = 30000; // 30 seconds
+        this.maxInterval = 300000; // 5 minutes
+        this.currentInterval = this.baseInterval;
+      }
+
+      async poll() {
+        const monitor = new AlertMonitoringSystem(this.apiKey);
+        const result = await monitor.getAlerts({ 
+          limit: 10,
+          status: 'new'
+        });
+
+        // Adaptive polling based on alert volume
+        if (result.data.length > 5) {
+          // High activity - poll more frequently
+          this.currentInterval = this.baseInterval;
+        } else if (result.data.length === 0) {
+          // No activity - slow down
+          this.currentInterval = Math.min(
+            this.currentInterval * 1.5,
+            this.maxInterval
+          );
+        }
+
+        console.log(`Next poll in ${this.currentInterval/1000}s`);
+        return result.data;
+      }
+    }
+    ```
+    
+    <Tip>
+      Use adaptive polling intervals based on alert volume to optimize API usage.
+    </Tip>
+  </Accordion>
+  
+  <Accordion title="Alert Deduplication" icon="filter">
+    Prevent processing duplicate alerts:
+    
+    ```javascript
+    class AlertDeduplicator {
+      constructor() {
+        this.processedAlerts = new Set();
+        this.maxCacheSize = 10000;
+      }
+
+      isDuplicate(alertId) {
+        return this.processedAlerts.has(alertId);
+      }
+
+      markProcessed(alertId) {
+        this.processedAlerts.add(alertId);
+
+        // Prevent memory issues
+        if (this.processedAlerts.size > this.maxCacheSize) {
+          const toDelete = Array.from(this.processedAlerts)
+            .slice(0, 1000);
+          toDelete.forEach(id => this.processedAlerts.delete(id));
+        }
+      }
+
+      processAlert(alert) {
+        if (this.isDuplicate(alert.alert_id)) {
+          console.log(`⏭️ Skipping duplicate alert #${alert.alert_id}`);
+          return false;
+        }
+
+        this.markProcessed(alert.alert_id);
+        console.log(`✅ Processing alert #${alert.alert_id}`);
+        return true;
+      }
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Priority Queue" icon="layer-group">
+    Process alerts by severity priority:
+    
+    ```javascript
+    class AlertPriorityQueue {
+      constructor() {
+        this.queues = {
+          high: [],
+          medium: [],
+          low: []
+        };
+      }
+
+      add(alert) {
+        this.queues[alert.severity].push(alert);
+      }
+
+      addBatch(alerts) {
+        alerts.forEach(alert => this.add(alert));
+      }
+
+      getNext() {
+        // Process high severity first
+        if (this.queues.high.length > 0) {
+          return this.queues.high.shift();
+        }
+        if (this.queues.medium.length > 0) {
+          return this.queues.medium.shift();
+        }
+        if (this.queues.low.length > 0) {
+          return this.queues.low.shift();
+        }
+        return null;
+      }
+
+      processAll(handler) {
+        let alert;
+        while ((alert = this.getNext()) !== null) {
+          handler(alert);
+        }
+      }
+
+      getStats() {
+        return {
+          high: this.queues.high.length,
+          medium: this.queues.medium.length,
+          low: this.queues.low.length,
+          total: this.queues.high.length + 
+                 this.queues.medium.length + 
+                 this.queues.low.length
+        };
+      }
+    }
+
+    // Usage
+    const queue = new AlertPriorityQueue();
+    const monitor = new AlertMonitoringSystem('YOUR_KEY');
+    const alerts = await monitor.getAlerts({ limit: 100 });
+    
+    queue.addBatch(alerts.data);
+    console.log('Queue stats:', queue.getStats());
+    
+    queue.processAll((alert) => {
+      console.log(`Processing ${alert.severity}: ${alert.triggering_account}`);
+    });
+    ```
+  </Accordion>
+  
+  <Accordion title="Alert Aggregation" icon="layer-group">
+    Group related alerts for better analysis:
+    
+    ```javascript
+    class AlertAggregator {
+      constructor(timeWindowMs = 60000) {
+        this.timeWindow = timeWindowMs;
+      }
+
+      aggregateByTime(alerts) {
+        const windows = {};
+        const now = Date.now();
+
+        alerts.forEach(alert => {
+          const alertTime = new Date(alert.triggered_at).getTime();
+          const windowKey = Math.floor(
+            (now - alertTime) / this.timeWindow
+          );
+
+          if (!windows[windowKey]) {
+            windows[windowKey] = [];
+          }
+          windows[windowKey].push(alert);
+        });
+
+        return windows;
+      }
+
+      aggregateByAccount(alerts) {
+        const byAccount = {};
+
+        alerts.forEach(alert => {
+          const account = alert.triggering_account;
+          if (!byAccount[account]) {
+            byAccount[account] = {
+              account,
+              alerts: [],
+              severities: { high: 0, medium: 0, low: 0 },
+              blocks: new Set()
+            };
+          }
+
+          byAccount[account].alerts.push(alert);
+          byAccount[account].severities[alert.severity]++;
+          byAccount[account].blocks.add(alert.block_height);
+        });
+
+        // Convert to array and add statistics
+        return Object.values(byAccount).map(item => ({
+          ...item,
+          totalAlerts: item.alerts.length,
+          blockCount: item.blocks.size,
+          blocks: Array.from(item.blocks)
+        }));
+      }
+
+      findBursts(alerts, burstThreshold = 5, burstWindowMs = 10000) {
+        // Sort alerts by time
+        const sorted = [...alerts].sort((a, b) => 
+          new Date(a.triggered_at) - new Date(b.triggered_at)
+        );
+
+        const bursts = [];
+        let currentBurst = [];
+
+        for (let i = 0; i < sorted.length; i++) {
+          const alert = sorted[i];
+          const alertTime = new Date(alert.triggered_at);
+
+          if (currentBurst.length === 0) {
+            currentBurst.push(alert);
+            continue;
+          }
+
+          const burstStartTime = new Date(currentBurst[0].triggered_at);
+          const timeDiff = alertTime - burstStartTime;
+
+          if (timeDiff <= burstWindowMs) {
+            currentBurst.push(alert);
+          } else {
+            // Check if current burst exceeds threshold
+            if (currentBurst.length >= burstThreshold) {
+              bursts.push({
+                alerts: currentBurst,
+                count: currentBurst.length,
+                startTime: currentBurst[0].triggered_at,
+                endTime: currentBurst[currentBurst.length - 1].triggered_at,
+                accounts: [...new Set(currentBurst.map(a => a.triggering_account))]
+              });
+            }
+            currentBurst = [alert];
+          }
+        }
+
+        // Check last burst
+        if (currentBurst.length >= burstThreshold) {
+          bursts.push({
+            alerts: currentBurst,
+            count: currentBurst.length,
+            startTime: currentBurst[0].triggered_at,
+            endTime: currentBurst[currentBurst.length - 1].triggered_at,
+            accounts: [...new Set(currentBurst.map(a => a.triggering_account))]
+          });
+        }
+
+        return bursts;
+      }
+    }
+
+    // Usage
+    const aggregator = new AlertAggregator(60000);
+    const monitor = new AlertMonitoringSystem('YOUR_KEY');
+    const alerts = await monitor.getAllAlerts(500);
+
+    // Aggregate by account
+    const byAccount = aggregator.aggregateByAccount(alerts);
+    console.log('Top alerted accounts:');
+    byAccount
+      .sort((a, b) => b.totalAlerts - a.totalAlerts)
+      .slice(0, 5)
+      .forEach(item => {
+        console.log(`${item.account}: ${item.totalAlerts} alerts (H:${item.severities.high} M:${item.severities.medium} L:${item.severities.low})`);
+      });
+
+    // Find alert bursts
+    const bursts = aggregator.findBursts(alerts, 5, 10000);
+    console.log(`\nFound ${bursts.length} alert bursts`);
+    bursts.forEach((burst, i) => {
+      console.log(`Burst ${i+1}: ${burst.count} alerts from ${burst.accounts.length} accounts`);
+    });
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Alert Response Playbook
+
+<Steps>
+  <Step title="Identify Alert Severity">
+    Categorize the alert and determine response priority:
+    - **High**: Immediate response (< 15 min)
+    - **Medium**: Investigation within 1 hour
+    - **Low**: Review during regular monitoring
+  </Step>
+  
+  <Step title="Gather Context">
+    Collect information about the triggering account:
+    ```javascript
+    const investigateAlert = async (alert) => {
+      // Get account details
+      const account = await getAccountDetails(alert.triggering_account);
+      
+      // Get recent transactions
+      const transactions = await getTransactions({
+        account: alert.triggering_account,
+        limit: 50
+      });
+      
+      // Check for related alerts
+      const relatedAlerts = await getAlerts({
+        account: alert.triggering_account,
+        limit: 100
+      });
+      
+      return { account, transactions, relatedAlerts };
+    };
+    ```
+  </Step>
+  
+  <Step title="Analyze Patterns">
+    Look for suspicious patterns:
+    - Unusual transaction volumes
+    - Rapid fund movements
+    - Interactions with known malicious contracts
+    - Timing patterns
+  </Step>
+  
+  <Step title="Take Action">
+    Based on findings, take appropriate action:
+    - Flag account for enhanced monitoring
+    - Update risk scores
+    - Block/restrict if necessary
+    - Report to authorities if required
+  </Step>
+  
+  <Step title="Document Findings">
+    Record investigation results:
+    ```javascript
+    const documentInvestigation = (alert, findings) => {
+      return {
+        alertId: alert.alert_id,
+        investigatedAt: new Date().toISOString(),
+        findings: findings,
+        actionTaken: 'Account flagged for monitoring',
+        status: 'resolved'
+      };
+    };
+    ```
+  </Step>
+</Steps>

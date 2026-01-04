@@ -1,0 +1,487 @@
+---
+title: "Burrow DeFi Positions"
+description: "Query lending and borrowing positions on Burrow, NEAR's decentralized money market protocol. Track supplied assets, collateral, borrowed amounts, and unclaimed farming rewards."
+icon: bank
+---
+
+import { Callout } from '@/components/ui/callout'
+
+## Get Burrow Positions
+
+```typescript
+import { ShadowCorpSDK } from 'shadowcorp';
+
+const sdk = new ShadowCorpSDK('your-api-key');
+
+const burrow = await sdk.accounts.getBurrow('example.near');
+console.log(burrow);
+```
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `accountId` | `string` | Yes | NEAR account identifier |
+
+### Response Structure
+
+```typescript
+{
+  has_positions: boolean;             // Whether account has any Burrow positions
+  supplied: Array<{                   // Assets supplied to the protocol
+    token_id: string;                 // Token contract ID
+    balance: string;                  // Supplied amount (in token's smallest unit)
+  }>;
+  collateral: Array<{                 // Assets used as collateral
+    token_id: string;                 // Token contract ID
+    balance: string;                  // Collateral amount
+  }>;
+  borrowed: Array<{                   // Borrowed assets
+    token_id: string;                 // Token contract ID
+    balance: string;                  // Borrowed amount
+  }>;
+  farm_rewards: Array<{               // Unclaimed farming rewards
+    farm_token_id: string;            // Token being farmed
+    reward_token_id: string;          // Reward token
+    unclaimed_amount: string;         // Unclaimed reward amount
+  }>;
+}
+```
+
+### Example Response
+
+```json
+{
+  "has_positions": true,
+  "supplied": [
+    {
+      "token_id": "lst.rhealab.near",
+      "balance": "25829974767408"
+    }
+  ],
+  "collateral": [],
+  "borrowed": [],
+  "farm_rewards": [
+    {
+      "farm_token_id": "lst.rhealab.near",
+      "reward_token_id": "lst.rhealab.near",
+      "unclaimed_amount": "20586823296"
+    }
+  ]
+}
+```
+
+### Error Handling
+
+```typescript
+try {
+  const burrow = await sdk.accounts.getBurrow('nonexistent.near');
+} catch (error) {
+  if (error.message.includes('not found')) {
+    console.log('Account not found');
+  } else {
+    console.error('Query failed:', error);
+  }
+}
+```
+
+## Understanding Burrow Data
+
+### Has Positions
+
+The `has_positions` flag quickly indicates if an account has any active Burrow positions:
+
+```typescript
+const burrow = await sdk.accounts.getBurrow('example.near');
+
+if (!burrow.has_positions) {
+  console.log('No Burrow positions found');
+  return;
+}
+
+console.log('Active Burrow user');
+```
+
+### Supplied Assets
+
+Assets in the `supplied` array are deposited into Burrow and earning interest:
+
+```typescript
+async function getSuppliedAssets(accountId: string) {
+  const burrow = await sdk.accounts.getBurrow(accountId);
+  
+  const supplied = await Promise.all(
+    burrow.supplied.map(async (asset) => {
+      const metadata = await sdk.tokens.getMetadata(asset.token_id);
+      const amount = BigInt(asset.balance);
+      const divisor = BigInt(10 ** metadata.decimals);
+      const formatted = (Number(amount) / Number(divisor)).toFixed(metadata.decimals);
+      
+      return {
+        token: metadata.symbol,
+        amount: `${formatted} ${metadata.symbol}`,
+        tokenId: asset.token_id
+      };
+    })
+  );
+  
+  return supplied;
+}
+
+const supplied = await getSuppliedAssets('example.near');
+supplied.forEach(asset => {
+  console.log(`Supplied: ${asset.amount}`);
+});
+```
+
+### Collateral
+
+Collateral assets secure borrowed positions and determine borrowing capacity:
+
+```typescript
+async function getCollateralValue(accountId: string) {
+  const burrow = await sdk.accounts.getBurrow(accountId);
+  
+  if (burrow.collateral.length === 0) {
+    return { total: 0, assets: [] };
+  }
+  
+  const collateralAssets = await Promise.all(
+    burrow.collateral.map(async (asset) => {
+      const metadata = await sdk.tokens.getMetadata(asset.token_id);
+      const amount = BigInt(asset.balance);
+      const divisor = BigInt(10 ** metadata.decimals);
+      const formatted = (Number(amount) / Number(divisor)).toFixed(metadata.decimals);
+      
+      return {
+        token: metadata.symbol,
+        amount: formatted,
+        tokenId: asset.token_id
+      };
+    })
+  );
+  
+  return {
+    hasCollateral: true,
+    assets: collateralAssets
+  };
+}
+```
+
+### Borrowed Assets
+
+The `borrowed` array shows outstanding debt positions:
+
+```typescript
+async function getBorrowedAssets(accountId: string) {
+  const burrow = await sdk.accounts.getBurrow(accountId);
+  
+  if (burrow.borrowed.length === 0) {
+    return { hasDebt: false, assets: [] };
+  }
+  
+  const borrowed = await Promise.all(
+    burrow.borrowed.map(async (asset) => {
+      const metadata = await sdk.tokens.getMetadata(asset.token_id);
+      const amount = BigInt(asset.balance);
+      const divisor = BigInt(10 ** metadata.decimals);
+      const formatted = (Number(amount) / Number(divisor)).toFixed(metadata.decimals);
+      
+      return {
+        token: metadata.symbol,
+        amount: `${formatted} ${metadata.symbol}`,
+        tokenId: asset.token_id
+      };
+    })
+  );
+  
+  return {
+    hasDebt: true,
+    totalPositions: borrowed.length,
+    assets: borrowed
+  };
+}
+```
+
+### Farm Rewards
+
+Unclaimed rewards from liquidity mining:
+
+```typescript
+async function getUnclaimedRewards(accountId: string) {
+  const burrow = await sdk.accounts.getBurrow(accountId);
+  
+  const rewards = await Promise.all(
+    burrow.farm_rewards.map(async (reward) => {
+      const metadata = await sdk.tokens.getMetadata(reward.reward_token_id);
+      const amount = BigInt(reward.unclaimed_amount);
+      const divisor = BigInt(10 ** metadata.decimals);
+      const formatted = (Number(amount) / Number(divisor)).toFixed(metadata.decimals);
+      
+      return {
+        farming: reward.farm_token_id,
+        rewardToken: metadata.symbol,
+        unclaimed: `${formatted} ${metadata.symbol}`,
+        rawAmount: reward.unclaimed_amount
+      };
+    })
+  );
+  
+  return rewards;
+}
+
+const rewards = await getUnclaimedRewards('example.near');
+rewards.forEach(r => {
+  console.log(`${r.unclaimed} pending from ${r.farming}`);
+});
+```
+
+## Use Cases
+
+### Burrow Position Dashboard
+
+Display complete Burrow position summary:
+
+```typescript
+async function getBurrowDashboard(accountId: string) {
+  const burrow = await sdk.accounts.getBurrow(accountId);
+  
+  if (!burrow.has_positions) {
+    return { hasPositions: false };
+  }
+  
+  const suppliedCount = burrow.supplied.length;
+  const collateralCount = burrow.collateral.length;
+  const borrowedCount = burrow.borrowed.length;
+  const rewardsCount = burrow.farm_rewards.length;
+  
+  return {
+    hasPositions: true,
+    summary: {
+      suppliedAssets: suppliedCount,
+      collateralAssets: collateralCount,
+      borrowedAssets: borrowedCount,
+      pendingRewards: rewardsCount
+    },
+    positions: {
+      isLender: suppliedCount > 0,
+      isBorrower: borrowedCount > 0,
+      hasCollateral: collateralCount > 0,
+      hasRewards: rewardsCount > 0
+    }
+  };
+}
+
+const dashboard = await getBurrowDashboard('example.near');
+if (dashboard.hasPositions) {
+  console.log('Burrow Summary:', dashboard.summary);
+  console.log('Position Types:', dashboard.positions);
+}
+```
+
+### Health Factor Calculator
+
+Calculate position health based on collateral and debt:
+
+```typescript
+async function calculateHealthFactor(accountId: string) {
+  const burrow = await sdk.accounts.getBurrow(accountId);
+  
+  if (burrow.borrowed.length === 0) {
+    return {
+      healthFactor: 'Infinite',
+      status: 'Safe (No Debt)',
+      risk: 'None'
+    };
+  }
+  
+  // Simplified health factor calculation
+  // In reality, you'd need price data and collateral factors
+  const hasCollateral = burrow.collateral.length > 0;
+  const debtCount = burrow.borrowed.length;
+  
+  if (!hasCollateral && debtCount > 0) {
+    return {
+      healthFactor: '0',
+      status: 'Critical',
+      risk: 'High - No collateral!'
+    };
+  }
+  
+  // This is a placeholder - real calculation needs prices
+  return {
+    healthFactor: 'N/A',
+    status: 'Requires price data',
+    collateralAssets: burrow.collateral.length,
+    debtAssets: burrow.borrowed.length
+  };
+}
+```
+
+### Yield Farming Tracker
+
+Track farming rewards across positions:
+
+```typescript
+async function trackFarmingRewards(accountId: string) {
+  const burrow = await sdk.accounts.getBurrow(accountId);
+  
+  if (burrow.farm_rewards.length === 0) {
+    return { hasFarms: false, totalRewards: 0 };
+  }
+  
+  const rewardsByToken = new Map<string, bigint>();
+  
+  for (const reward of burrow.farm_rewards) {
+    const current = rewardsByToken.get(reward.reward_token_id) || 0n;
+    const amount = BigInt(reward.unclaimed_amount);
+    rewardsByToken.set(reward.reward_token_id, current + amount);
+  }
+  
+  const rewardsSummary = [];
+  for (const [tokenId, amount] of rewardsByToken) {
+    const metadata = await sdk.tokens.getMetadata(tokenId);
+    const divisor = BigInt(10 ** metadata.decimals);
+    const formatted = (Number(amount) / Number(divisor)).toFixed(metadata.decimals);
+    
+    rewardsSummary.push({
+      token: metadata.symbol,
+      amount: formatted,
+      raw: amount.toString()
+    });
+  }
+  
+  return {
+    hasFarms: true,
+    totalFarms: burrow.farm_rewards.length,
+    uniqueRewardTokens: rewardsByToken.size,
+    rewards: rewardsSummary
+  };
+}
+
+const farming = await trackFarmingRewards('example.near');
+if (farming.hasFarms) {
+  console.log(`${farming.totalFarms} active farms`);
+  farming.rewards.forEach(r => {
+    console.log(`Unclaimed: ${r.amount} ${r.token}`);
+  });
+}
+```
+
+### DeFi Risk Analyzer
+
+Analyze DeFi exposure and risk:
+
+```typescript
+async function analyzeDeFiRisk(accountId: string) {
+  const burrow = await sdk.accounts.getBurrow(accountId);
+  
+  const riskFactors = {
+    hasDebt: burrow.borrowed.length > 0,
+    debtWithoutCollateral: burrow.borrowed.length > 0 && burrow.collateral.length === 0,
+    multipleAssets: burrow.supplied.length > 3,
+    concentratedPosition: burrow.supplied.length === 1 && burrow.supplied[0].balance > '1000000000000',
+    hasUnclaimedRewards: burrow.farm_rewards.length > 0
+  };
+  
+  const riskScore = Object.values(riskFactors).filter(Boolean).length;
+  
+  let riskLevel = 'Low';
+  if (riskScore >= 3) riskLevel = 'High';
+  else if (riskScore >= 2) riskLevel = 'Medium';
+  
+  return {
+    riskLevel,
+    riskScore: `${riskScore}/5`,
+    factors: riskFactors,
+    recommendation: riskFactors.debtWithoutCollateral 
+      ? 'Add collateral immediately!'
+      : 'Monitor position regularly'
+  };
+}
+
+const risk = await analyzeDeFiRisk('example.near');
+console.log(`Risk Level: ${risk.riskLevel}`);
+console.log(`Recommendation: ${risk.recommendation}`);
+```
+
+### Portfolio Diversification Checker
+
+Check asset diversification across Burrow positions:
+
+```typescript
+async function checkDiversification(accountId: string) {
+  const burrow = await sdk.accounts.getBurrow(accountId);
+  
+  const allAssets = new Set([
+    ...burrow.supplied.map(a => a.token_id),
+    ...burrow.collateral.map(a => a.token_id),
+    ...burrow.borrowed.map(a => a.token_id)
+  ]);
+  
+  const diversification = {
+    uniqueAssets: allAssets.size,
+    suppliedAssets: burrow.supplied.length,
+    isDiversified: allAssets.size >= 3,
+    concentration: burrow.supplied.length === 1 ? 'High' : 'Medium'
+  };
+  
+  return diversification;
+}
+```
+
+## Best Practices
+
+### Check has_positions First
+
+<Callout type="tip">
+Always check `has_positions` before processing position arrays to avoid unnecessary work.
+</Callout>
+
+```typescript
+const burrow = await sdk.accounts.getBurrow('example.near');
+
+if (!burrow.has_positions) {
+  console.log('No Burrow positions');
+  return;
+}
+
+// Process positions...
+```
+
+### Handle Token Metadata
+
+Always fetch token metadata to properly format amounts:
+
+```typescript
+async function formatBurrowBalance(tokenId: string, balance: string) {
+  const metadata = await sdk.tokens.getMetadata(tokenId);
+  const amount = BigInt(balance);
+  const divisor = BigInt(10 ** metadata.decimals);
+  const formatted = (Number(amount) / Number(divisor)).toFixed(metadata.decimals);
+  return `${formatted} ${metadata.symbol}`;
+}
+```
+
+### Monitor Rewards
+
+Set up monitoring for unclaimed rewards:
+
+```typescript
+async function shouldClaimRewards(accountId: string, minThreshold: number = 1) {
+  const burrow = await sdk.accounts.getBurrow(accountId);
+  
+  for (const reward of burrow.farm_rewards) {
+    const metadata = await sdk.tokens.getMetadata(reward.reward_token_id);
+    const amount = Number(reward.unclaimed_amount) / (10 ** metadata.decimals);
+    
+    if (amount >= minThreshold) {
+      return { shouldClaim: true, amount, token: metadata.symbol };
+    }
+  }
+  
+  return { shouldClaim: false };
+}
+```
+
+For support: [support@shadowcorp.dev](mailto:support@shadowcorp.dev)

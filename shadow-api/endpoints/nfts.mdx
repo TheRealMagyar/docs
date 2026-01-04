@@ -1,0 +1,766 @@
+---
+title: NFTs
+description: Retrieve detailed metadata for NFT collections on the NEAR blockchain. Access collection information, token standards, supply data, and on-chain metadata.
+icon: file-image
+---
+
+import { Endpoint, Request } from '@mintlify/components';
+
+## Get NFT Collection Metadata
+
+<Endpoint method="GET" path="/v1/nfts/:id/metadata" />
+
+Retrieve comprehensive metadata for a specific NFT collection, including contract information, token standards, supply metrics, and collection-level metadata.
+
+<Info>
+  This endpoint provides static collection-level metadata. For individual token metadata and dynamic attributes, use the token-specific endpoints.
+</Info>
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  The NFT collection contract ID. This is the NEAR account that deployed the NFT contract (e.g., `asac.near`, `mintbase1.near`, `paras-token-v2.near`).
+  
+  **Examples:**
+  - `asac.near` - Antisocial Ape Club
+  - `mintbase1.near` - Mintbase collections
+  - `paras-token-v2.near` - Paras digital collectibles
+  - `near` - NEAR Protocol domain names
+</ParamField>
+
+### Making Requests
+
+<Tabs>
+  <Tab title="cURL">
+    **Get collection metadata:**
+    ```bash
+    curl -H "X-API-Key: YOUR_KEY" \
+      "https://api.shadowcorp.dev/v1/nfts/asac.near/metadata"
+    ```
+
+    **Popular collections:**
+    ```bash
+    # Mintbase
+    curl -H "X-API-Key: YOUR_KEY" \
+      "https://api.shadowcorp.dev/v1/nfts/mintbase1.near/metadata"
+
+    # Paras
+    curl -H "X-API-Key: YOUR_KEY" \
+      "https://api.shadowcorp.dev/v1/nfts/paras-token-v2.near/metadata"
+
+    # Near Protocol domains
+    curl -H "X-API-Key: YOUR_KEY" \
+      "https://api.shadowcorp.dev/v1/nfts/near/metadata"
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    // Get NFT collection metadata
+    const getCollectionMetadata = async (contractId) => {
+      const response = await fetch(
+        `https://api.shadowcorp.dev/v1/nfts/${contractId}/metadata`,
+        {
+          headers: {
+            'X-API-Key': 'YOUR_KEY'
+          }
+        }
+      );
+      return await response.json();
+    };
+
+    // Get multiple collections
+    const getMultipleCollections = async (contractIds) => {
+      const promises = contractIds.map(id => 
+        getCollectionMetadata(id)
+      );
+      return await Promise.all(promises);
+    };
+
+    // Usage
+    const asacMetadata = await getCollectionMetadata('asac.near');
+    console.log(`Collection: ${asacMetadata.name}`);
+    console.log(`Symbol: ${asacMetadata.symbol}`);
+    console.log(`Base URI: ${asacMetadata.base_uri}`);
+
+    // Get multiple collections at once
+    const collections = await getMultipleCollections([
+      'asac.near',
+      'mintbase1.near',
+      'paras-token-v2.near'
+    ]);
+    ```
+  </Tab>
+  
+  <Tab title="Python">
+    ```python
+    import requests
+
+    class NFTMetadataAPI:
+        def __init__(self, api_key):
+            self.base_url = 'https://api.shadowcorp.dev'
+            self.headers = {'X-API-Key': api_key}
+        
+        def get_collection_metadata(self, contract_id):
+            """Get metadata for NFT collection"""
+            response = requests.get(
+                f'{self.base_url}/v1/nfts/{contract_id}/metadata',
+                headers=self.headers
+            )
+            return response.json()
+        
+        def get_multiple_collections(self, contract_ids):
+            """Get metadata for multiple collections"""
+            return [
+                self.get_collection_metadata(contract_id)
+                for contract_id in contract_ids
+            ]
+        
+        def get_collection_summary(self, contract_id):
+            """Get formatted summary of collection"""
+            data = self.get_collection_metadata(contract_id)
+            return {
+                'contract_id': data.get('contract_id'),
+                'name': data.get('name'),
+                'symbol': data.get('symbol'),
+                'icon': data.get('icon'),
+                'base_uri': data.get('base_uri')
+            }
+
+    # Usage
+    api = NFTMetadataAPI('YOUR_KEY')
+    
+    # Single collection
+    metadata = api.get_collection_metadata('asac.near')
+    print(f"Collection: {metadata['name']}")
+    print(f"Base URI: {metadata['base_uri']}")
+    
+    # Multiple collections
+    collections = api.get_multiple_collections([
+        'asac.near',
+        'mintbase1.near',
+        'paras-token-v2.near'
+    ])
+    
+    for collection in collections:
+        name = collection['name'] or collection['contract_id']
+        print(f"{name}: {collection.get('base_uri', 'No URI')}")
+    ```
+  </Tab>
+  
+  <Tab title="Go">
+    ```go
+    package main
+
+    import (
+        "encoding/json"
+        "fmt"
+        "net/http"
+    )
+
+    type NFTMetadataClient struct {
+        BaseURL string
+        APIKey  string
+        Client  *http.Client
+    }
+
+    type CollectionMetadata struct {
+        ContractID  string  `json:"contract_id"`
+        Name        string  `json:"name"`
+        Symbol      string  `json:"symbol"`
+        Icon        *string `json:"icon"`
+        BaseURI     *string `json:"base_uri"`
+    }
+
+    func NewNFTMetadataClient(apiKey string) *NFTMetadataClient {
+        return &NFTMetadataClient{
+            BaseURL: "https://api.shadowcorp.dev",
+            APIKey:  apiKey,
+            Client:  &http.Client{},
+        }
+    }
+
+    func (c *NFTMetadataClient) GetCollectionMetadata(contractID string) (*CollectionMetadata, error) {
+        reqURL := fmt.Sprintf("%s/v1/nfts/%s/metadata", c.BaseURL, contractID)
+        
+        req, err := http.NewRequest("GET", reqURL, nil)
+        if err != nil {
+            return nil, err
+        }
+        
+        req.Header.Add("X-API-Key", c.APIKey)
+        
+        resp, err := c.Client.Do(req)
+        if err != nil {
+            return nil, err
+        }
+        defer resp.Body.Close()
+
+        var metadata CollectionMetadata
+        if err := json.NewDecoder(resp.Body).Decode(&metadata); err != nil {
+            return nil, err
+        }
+        
+        return &metadata, nil
+    }
+
+    func (c *NFTMetadataClient) GetMultipleCollections(contractIDs []string) ([]*CollectionMetadata, error) {
+        results := make([]*CollectionMetadata, 0, len(contractIDs))
+        
+        for _, id := range contractIDs {
+            metadata, err := c.GetCollectionMetadata(id)
+            if err != nil {
+                return nil, err
+            }
+            results = append(results, metadata)
+        }
+        
+        return results, nil
+    }
+
+    func main() {
+        client := NewNFTMetadataClient("YOUR_KEY")
+        
+        // Get single collection
+        metadata, err := client.GetCollectionMetadata("asac.near")
+        if err != nil {
+            panic(err)
+        }
+        
+        fmt.Printf("Collection: %s\n", metadata.Name)
+        fmt.Printf("Base URI: %v\n", metadata.BaseURI)
+        
+        // Get multiple collections
+        collections, err := client.GetMultipleCollections([]string{
+            "asac.near",
+            "mintbase1.near",
+            "paras-token-v2.near",
+        })
+        if err != nil {
+            panic(err)
+        }
+        
+        for _, col := range collections {
+            name := col.Name
+            if name == "" {
+                name = col.ContractID
+            }
+            baseURI := "No URI"
+            if col.BaseURI != nil {
+                baseURI = *col.BaseURI
+            }
+            fmt.Printf("%s: %s\n", name, baseURI)
+        }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Response Format
+
+<ResponseField name="contract_id" type="string" required>
+  The NFT collection contract address.
+</ResponseField>
+
+<ResponseField name="name" type="string" required>
+  Human-readable name of the NFT collection. May be empty for some contracts.
+</ResponseField>
+
+<ResponseField name="symbol" type="string" required>
+  Trading symbol or ticker for the collection. May be empty for some contracts.
+</ResponseField>
+
+<ResponseField name="icon" type="string">
+  URL or data URI of the collection's icon image. Returns `null` if not set.
+</ResponseField>
+
+<ResponseField name="base_uri" type="string">
+  Base URI for token metadata. Individual token metadata is typically at `{base_uri}/{token_id}`. Returns `null` if not set.
+</ResponseField>
+
+<Note>
+  The API returns only the core metadata fields that are available on-chain. Additional metadata may need to be fetched from the `base_uri` if provided.
+</Note>
+
+### Success Response (200 OK)
+
+**ASAC Collection (Full metadata):**
+```json
+{
+  "contract_id": "asac.near",
+  "name": "Antisocial Ape Club",
+  "symbol": "ASAC",
+  "icon": null,
+  "base_uri": "https://ipfs.io/ipfs/bafybeicj5zfhe3ytmfleeiindnqlj7ydkpoyitxm7idxdw2kucchojf7v4"
+}
+```
+
+**Mintbase Collection (Minimal metadata):**
+```json
+{
+  "contract_id": "mintbase1.near",
+  "name": "",
+  "symbol": "",
+  "icon": null,
+  "base_uri": null
+}
+```
+
+<Check>
+  A `200 OK` status code indicates the collection metadata was retrieved successfully. Note that some collections may have empty or null metadata fields.
+</Check>
+
+## Understanding NFT Standards
+
+<AccordionGroup>
+  <Accordion title="NEP-171: Core NFT Standard" icon="layer-group">
+    The foundational NFT standard on NEAR that defines basic NFT functionality:
+    
+    - Token ownership and transfers
+    - Enumeration (listing tokens)
+    - Metadata structure
+    - Approval management
+    
+    **Key methods:**
+    - `nft_transfer` - Transfer NFT ownership
+    - `nft_token` - Get token details
+    - `nft_tokens_for_owner` - List tokens owned by account
+    
+    Most NFT collections implement at least NEP-171.
+  </Accordion>
+  
+  <Accordion title="NEP-177: Metadata Standard" icon="file-lines">
+    Defines how NFT metadata should be structured and accessed:
+    
+    ```json
+    {
+      "title": "Token #1234",
+      "description": "A unique digital collectible",
+      "media": "https://ipfs.io/ipfs/...",
+      "media_hash": "abc123...",
+      "copies": 1,
+      "issued_at": "2024-01-01T00:00:00Z",
+      "expires_at": null,
+      "starts_at": null,
+      "updated_at": null,
+      "extra": "{\"rarity\": \"legendary\"}",
+      "reference": "https://arweave.net/...",
+      "reference_hash": "xyz789..."
+    }
+    ```
+    
+    <Tip>
+      The `reference` field typically points to IPFS or Arweave for decentralized storage.
+    </Tip>
+  </Accordion>
+  
+  <Accordion title="NEP-178: Approval Management" icon="check-double">
+    Enables marketplace functionality by allowing approved accounts to transfer NFTs:
+    
+    - Grant transfer approval to marketplaces
+    - Revoke approvals
+    - Check approval status
+    
+    **Use cases:**
+    - Listing NFTs on marketplaces
+    - Delegated transfers
+    - Escrow contracts
+    
+    Popular marketplaces like Paras and Mintbase rely on NEP-178.
+  </Accordion>
+  
+  <Accordion title="Token Supply Metrics" icon="chart-simple">
+    Understanding collection data limitations:
+    
+    ```javascript
+    const metadata = await getCollectionMetadata('asac.near');
+    
+    // Available fields
+    console.log(`Contract: ${metadata.contract_id}`);
+    console.log(`Name: ${metadata.name || 'Not set'}`);
+    console.log(`Symbol: ${metadata.symbol || 'Not set'}`);
+    console.log(`Base URI: ${metadata.base_uri || 'Not set'}`);
+    
+    // To get total supply, holder count, or other advanced metrics,
+    // you'll need to use the NFT transfers endpoint and aggregate the data
+    ```
+    
+    <Warning>
+      The metadata endpoint returns only basic on-chain data. For supply metrics, use the NFT transfers endpoint to calculate totals.
+    </Warning>
+  </Accordion>
+</AccordionGroup>
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Collection Discovery" icon="magnifying-glass" color="#3b82f6">
+    Build NFT marketplace collection browsers with detailed metadata display.
+  </Card>
+  
+  <Card title="Portfolio Analytics" icon="chart-pie" color="#8b5cf6">
+    Aggregate collection data for user portfolio value tracking.
+  </Card>
+  
+  <Card title="Rarity Tools" icon="gem" color="#f59e0b">
+    Calculate rarity scores and rankings based on collection supply.
+  </Card>
+  
+  <Card title="Verification Systems" icon="shield-check" color="#10b981">
+    Verify collection authenticity using reference hashes and owner information.
+  </Card>
+</CardGroup>
+
+## Advanced Example: Collection Analyzer
+
+Here's a complete example of an NFT collection analysis tool:
+
+```javascript
+class NFTCollectionAnalyzer {
+  constructor(apiKey) {
+    this.apiKey = apiKey;
+    this.baseUrl = 'https://api.shadowcorp.dev';
+    this.cache = new Map();
+  }
+
+  async getMetadata(contractId, useCache = true) {
+    // Check cache first
+    if (useCache && this.cache.has(contractId)) {
+      console.log(`✅ Using cached data for ${contractId}`);
+      return this.cache.get(contractId);
+    }
+
+    console.log(`🔍 Fetching metadata for ${contractId}...`);
+    const response = await fetch(
+      `${this.baseUrl}/v1/nfts/${contractId}/metadata`,
+      {
+        headers: { 'X-API-Key': this.apiKey }
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch ${contractId}: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    this.cache.set(contractId, data);
+    return data;
+  }
+
+  async compareCollections(contractIds) {
+    console.log(`📊 Comparing ${contractIds.length} collections...\n`);
+    
+    const collections = await Promise.all(
+      contractIds.map(id => this.getMetadata(id))
+    );
+
+    // Sort by name (alphabetically)
+    const sorted = collections.sort((a, b) => {
+      const nameA = a.name || a.contract_id;
+      const nameB = b.name || b.contract_id;
+      return nameA.localeCompare(nameB);
+    });
+
+    // Display comparison table
+    console.log('Collection Comparison:');
+    console.log('─'.repeat(70));
+    console.log(
+      'Name'.padEnd(30) + 
+      'Symbol'.padEnd(15) + 
+      'Has Base URI'
+    );
+    console.log('─'.repeat(70));
+
+    sorted.forEach(col => {
+      const name = (col.name || col.contract_id).substring(0, 28);
+      const symbol = (col.symbol || 'N/A').substring(0, 13);
+      const hasUri = col.base_uri ? '✅' : '❌';
+      console.log(
+        name.padEnd(30) +
+        symbol.padEnd(15) +
+        hasUri
+      );
+    });
+
+    console.log('─'.repeat(70));
+
+    return sorted;
+  }
+
+  async getCollectionStats(contractId) {
+    const metadata = await this.getMetadata(contractId);
+    
+    const stats = {
+      contractId: metadata.contract_id,
+      name: metadata.name || 'Unknown',
+      symbol: metadata.symbol || 'N/A',
+      hasIcon: metadata.icon !== null,
+      hasBaseUri: metadata.base_uri !== null,
+      baseUri: metadata.base_uri
+    };
+
+    return stats;
+  }
+
+  isVerified(metadata) {
+    // Basic verification: has name and base_uri
+    return !!(
+      metadata.name && 
+      metadata.base_uri
+    );
+  }
+
+  async generateReport(contractId) {
+    const stats = await this.getCollectionStats(contractId);
+    
+    console.log('\n' + '='.repeat(60));
+    console.log(`NFT Collection Report: ${stats.name}`);
+    console.log('='.repeat(60));
+    console.log(`\nBasic Information:`);
+    console.log(`  Contract: ${stats.contractId}`);
+    console.log(`  Name: ${stats.name}`);
+    console.log(`  Symbol: ${stats.symbol}`);
+    console.log(`\nMetadata Status:`);
+    console.log(`  Icon: ${stats.hasIcon ? '✅' : '❌'}`);
+    console.log(`  Base URI: ${stats.hasBaseUri ? '✅' : '❌'}`);
+    if (stats.baseUri) {
+      console.log(`  URI: ${stats.baseUri}`);
+    }
+    console.log('='.repeat(60) + '\n');
+
+    return stats;
+  }
+}
+
+// Usage Examples
+const analyzer = new NFTCollectionAnalyzer('YOUR_KEY');
+
+// Single collection report
+await analyzer.generateReport('asac.near');
+
+// Compare multiple collections
+await analyzer.compareCollections([
+  'asac.near',
+  'mintbase1.near',
+  'paras-token-v2.near',
+  'near'
+]);
+
+// Get detailed stats
+const stats = await analyzer.getCollectionStats('asac.near');
+console.log(`${stats.name} base URI: ${stats.baseUri || 'Not set'}`);
+```
+
+## Metadata Verification
+
+Verify collection authenticity using the base URI:
+
+```javascript
+async function verifyCollectionMetadata(contractId) {
+  const metadata = await fetch(
+    `https://api.shadowcorp.dev/v1/nfts/${contractId}/metadata`,
+    { headers: { 'X-API-Key': 'YOUR_KEY' } }
+  ).then(r => r.json());
+
+  // Check if collection has proper metadata setup
+  if (!metadata.name) {
+    console.log('⚠️  Collection has no name');
+  }
+  
+  if (!metadata.base_uri) {
+    console.log('⚠️  No base URI provided');
+    return false;
+  }
+
+  try {
+    // Test if base_uri is accessible
+    const testUrl = `${metadata.base_uri}/1`;
+    const response = await fetch(testUrl);
+    
+    if (response.ok) {
+      console.log('✅ Base URI is accessible');
+      const tokenMetadata = await response.json();
+      console.log('Sample token metadata:', tokenMetadata);
+      return true;
+    } else {
+      console.log('❌ Base URI not accessible');
+      return false;
+    }
+  } catch (error) {
+    console.error('❌ Verification failed:', error.message);
+    return false;
+  }
+}
+
+// Verify a collection
+await verifyCollectionMetadata('asac.near');
+```
+
+## Error Responses
+
+### 400 Bad Request
+
+```json
+{
+  "error": "Invalid contract ID format",
+  "code": 400
+}
+```
+
+<Warning>
+  Ensure the contract ID follows NEAR naming conventions (e.g., `collection.near` or `collection.mintbase1.near`).
+</Warning>
+
+### 401 Unauthorized
+
+```json
+{
+  "error": "Missing or invalid API key",
+  "code": 401
+}
+```
+
+### 404 Not Found
+
+```json
+{
+  "error": "NFT collection not found",
+  "code": 404,
+  "contract_id": "invalid.near"
+}
+```
+
+<Note>
+  A 404 error means the contract either does not exist or is not an NFT collection contract.
+</Note>
+
+### 500 Internal Server Error
+
+```json
+{
+  "error": "Failed to fetch collection metadata",
+  "code": 500
+}
+```
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+  <Card 
+    title="NFT Transfers" 
+    icon="right-left" 
+    href="/shadow-api/endpoints/nft-transfers"
+  >
+    Track all NFT transfers for this collection
+  </Card>
+  
+  <Card 
+    title="Account NFTs" 
+    icon="user-circle" 
+    href="/shadow-api/endpoints/full-account-data"
+  >
+    View NFTs owned by specific accounts
+  </Card>
+  
+  <Card 
+    title="Token Details" 
+    icon="coins" 
+    href="/shadow-api/endpoints/tokens"
+  >
+    Get metadata for individual tokens
+  </Card>
+  
+  <Card 
+    title="Collection Activity" 
+    icon="chart-line" 
+    href="/shadow-api/endpoints/nft-transfers"
+  >
+    Monitor real-time collection activity
+  </Card>
+</CardGroup>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Caching Strategy" icon="database">
+    Collection metadata rarely changes. Implement caching to reduce API calls:
+    
+    ```javascript
+    const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+    
+    class MetadataCache {
+      constructor() {
+        this.cache = new Map();
+      }
+      
+      async get(contractId, fetcher) {
+        const cached = this.cache.get(contractId);
+        
+        if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+          return cached.data;
+        }
+        
+        const data = await fetcher(contractId);
+        this.cache.set(contractId, {
+          data,
+          timestamp: Date.now()
+        });
+        
+        return data;
+      }
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Error Handling" icon="triangle-exclamation">
+    Always handle potential errors gracefully:
+    
+    ```javascript
+    async function safeGetMetadata(contractId) {
+      try {
+        const response = await fetch(
+          `https://api.shadowcorp.dev/v1/nfts/${contractId}/metadata`,
+          { headers: { 'X-API-Key': 'YOUR_KEY' } }
+        );
+        
+        if (!response.ok) {
+          if (response.status === 404) {
+            return { error: 'Collection not found' };
+          }
+          throw new Error(`HTTP ${response.status}`);
+        }
+        
+        return await response.json();
+      } catch (error) {
+        console.error(`Failed to fetch ${contractId}:`, error);
+        return { error: error.message };
+      }
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Batch Processing" icon="layer-group">
+    When fetching multiple collections, use Promise.all but add rate limiting:
+    
+    ```javascript
+    async function batchGetMetadata(contractIds, batchSize = 5) {
+      const results = [];
+      
+      for (let i = 0; i < contractIds.length; i += batchSize) {
+        const batch = contractIds.slice(i, i + batchSize);
+        const batchResults = await Promise.all(
+          batch.map(id => getCollectionMetadata(id))
+        );
+        results.push(...batchResults);
+        
+        // Small delay between batches
+        if (i + batchSize < contractIds.length) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }
+      
+      return results;
+    }
+    ```
+  </Accordion>
+</AccordionGroup>

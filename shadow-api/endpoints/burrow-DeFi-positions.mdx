@@ -1,0 +1,1436 @@
+---
+title: Burrow DeFi Positions
+description: Retrieve detailed DeFi positions for accounts on Burrow, NEAR's leading money market protocol. Access supplied assets, collateral, borrowed positions, and farm rewards.
+icon: exchange
+---
+
+import { Endpoint, Request } from '@mintlify/components';
+
+## Get Burrow DeFi Positions
+
+<Endpoint method="GET" path="/v1/accounts/:id/burrow" />
+
+Retrieve comprehensive DeFi position data for a specific account on Burrow, including supplied assets, collateral positions, borrowed amounts, and unclaimed farm rewards.
+
+<Info>
+  Burrow is NEAR's leading money market protocol for lending, borrowing, and earning yield on crypto assets. This endpoint provides a complete snapshot of an account's positions.
+</Info>
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  The NEAR account ID to query Burrow positions for.
+  
+  **Examples:**
+  - `nameless753.near` - Regular NEAR account
+  - `example.near` - Named account
+  - `abc123.near` - Any valid NEAR account ID
+</ParamField>
+
+### Making Requests
+
+<Tabs>
+  <Tab title="cURL">
+    **Get Burrow positions:**
+    ```bash
+    curl -H "X-API-Key: YOUR_KEY" \
+      "https://api.shadowcorp.dev/v1/accounts/nameless753.near/burrow"
+    ```
+
+    **Check multiple accounts:**
+    ```bash
+    # Account with positions
+    curl -H "X-API-Key: YOUR_KEY" \
+      "https://api.shadowcorp.dev/v1/accounts/nameless753.near/burrow"
+
+    # Account without positions
+    curl -H "X-API-Key: YOUR_KEY" \
+      "https://api.shadowcorp.dev/v1/accounts/example.near/burrow"
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    // Get Burrow positions for an account
+    const getBurrowPositions = async (accountId) => {
+      const response = await fetch(
+        `https://api.shadowcorp.dev/v1/accounts/${accountId}/burrow`,
+        {
+          headers: {
+            'X-API-Key': 'YOUR_KEY'
+          }
+        }
+      );
+      return await response.json();
+    };
+
+    // Check if account has positions
+    const hasActivePositions = async (accountId) => {
+      const data = await getBurrowPositions(accountId);
+      return data.has_positions;
+    };
+
+    // Get total supplied value (in raw token amounts)
+    const getTotalSupplied = async (accountId) => {
+      const data = await getBurrowPositions(accountId);
+      return data.supplied.reduce((total, position) => {
+        return total + BigInt(position.balance);
+      }, BigInt(0));
+    };
+
+    // Usage
+    const positions = await getBurrowPositions('nameless753.near');
+    console.log(`Has positions: ${positions.has_positions}`);
+    console.log(`Supplied assets: ${positions.supplied.length}`);
+    console.log(`Borrowed assets: ${positions.borrowed.length}`);
+    console.log(`Active farms: ${positions.farm_rewards.length}`);
+
+    // Check unclaimed rewards
+    positions.farm_rewards.forEach(farm => {
+      console.log(`Farm: ${farm.farm_token_id}`);
+      console.log(`Unclaimed: ${farm.unclaimed_amount}`);
+    });
+    ```
+  </Tab>
+  
+  <Tab title="Python">
+    ```python
+    import requests
+    from typing import Dict, List, Optional
+
+    class BurrowAPI:
+        def __init__(self, api_key: str):
+            self.base_url = 'https://api.shadowcorp.dev'
+            self.headers = {'X-API-Key': api_key}
+        
+        def get_positions(self, account_id: str) -> Dict:
+            """Get Burrow DeFi positions for account"""
+            response = requests.get(
+                f'{self.base_url}/v1/accounts/{account_id}/burrow',
+                headers=self.headers
+            )
+            return response.json()
+        
+        def has_positions(self, account_id: str) -> bool:
+            """Check if account has any Burrow positions"""
+            data = self.get_positions(account_id)
+            return data.get('has_positions', False)
+        
+        def get_supplied_tokens(self, account_id: str) -> List[str]:
+            """Get list of supplied token IDs"""
+            data = self.get_positions(account_id)
+            return [pos['token_id'] for pos in data.get('supplied', [])]
+        
+        def get_borrowed_tokens(self, account_id: str) -> List[str]:
+            """Get list of borrowed token IDs"""
+            data = self.get_positions(account_id)
+            return [pos['token_id'] for pos in data.get('borrowed', [])]
+        
+        def get_farm_rewards(self, account_id: str) -> List[Dict]:
+            """Get unclaimed farm rewards"""
+            data = self.get_positions(account_id)
+            return data.get('farm_rewards', [])
+        
+        def calculate_health_factor(self, account_id: str) -> Optional[str]:
+            """
+            Calculate account health factor
+            Note: Requires token prices for accurate calculation
+            """
+            data = self.get_positions(account_id)
+            
+            if not data.get('has_positions'):
+                return None
+            
+            # Simple check: has collateral and borrowed
+            has_collateral = len(data.get('collateral', [])) > 0
+            has_borrowed = len(data.get('borrowed', [])) > 0
+            
+            if has_borrowed and not has_collateral:
+                return "RISKY"
+            elif has_borrowed and has_collateral:
+                return "ACTIVE"
+            else:
+                return "HEALTHY"
+
+    # Usage
+    api = BurrowAPI('YOUR_KEY')
+    
+    # Get full positions
+    positions = api.get_positions('nameless753.near')
+    print(f"Has positions: {positions['has_positions']}")
+    print(f"Supplied: {len(positions['supplied'])} assets")
+    print(f"Collateral: {len(positions['collateral'])} assets")
+    print(f"Borrowed: {len(positions['borrowed'])} assets")
+    
+    # List supplied tokens
+    supplied_tokens = api.get_supplied_tokens('nameless753.near')
+    print(f"\nSupplied tokens: {supplied_tokens}")
+    
+    # Check farm rewards
+    rewards = api.get_farm_rewards('nameless753.near')
+    for reward in rewards:
+        print(f"\nFarm: {reward['farm_token_id']}")
+        print(f"Reward token: {reward['reward_token_id']}")
+        print(f"Unclaimed: {reward['unclaimed_amount']}")
+    
+    # Check health
+    health = api.calculate_health_factor('nameless753.near')
+    print(f"\nAccount health: {health}")
+    ```
+  </Tab>
+  
+  <Tab title="Go">
+    ```go
+    package main
+
+    import (
+        "encoding/json"
+        "fmt"
+        "net/http"
+    )
+
+    type BurrowClient struct {
+        BaseURL string
+        APIKey  string
+        Client  *http.Client
+    }
+
+    type Position struct {
+        TokenID string `json:"token_id"`
+        Balance string `json:"balance"`
+    }
+
+    type FarmReward struct {
+        FarmTokenID     string `json:"farm_token_id"`
+        RewardTokenID   string `json:"reward_token_id"`
+        UnclaimedAmount string `json:"unclaimed_amount"`
+    }
+
+    type BurrowPositions struct {
+        HasPositions bool         `json:"has_positions"`
+        Supplied     []Position   `json:"supplied"`
+        Collateral   []Position   `json:"collateral"`
+        Borrowed     []Position   `json:"borrowed"`
+        FarmRewards  []FarmReward `json:"farm_rewards"`
+    }
+
+    func NewBurrowClient(apiKey string) *BurrowClient {
+        return &BurrowClient{
+            BaseURL: "https://api.shadowcorp.dev",
+            APIKey:  apiKey,
+            Client:  &http.Client{},
+        }
+    }
+
+    func (c *BurrowClient) GetPositions(accountID string) (*BurrowPositions, error) {
+        reqURL := fmt.Sprintf("%s/v1/accounts/%s/burrow", c.BaseURL, accountID)
+        
+        req, err := http.NewRequest("GET", reqURL, nil)
+        if err != nil {
+            return nil, err
+        }
+        
+        req.Header.Add("X-API-Key", c.APIKey)
+        
+        resp, err := c.Client.Do(req)
+        if err != nil {
+            return nil, err
+        }
+        defer resp.Body.Close()
+
+        var positions BurrowPositions
+        if err := json.NewDecoder(resp.Body).Decode(&positions); err != nil {
+            return nil, err
+        }
+        
+        return &positions, nil
+    }
+
+    func (c *BurrowClient) HasPositions(accountID string) (bool, error) {
+        positions, err := c.GetPositions(accountID)
+        if err != nil {
+            return false, err
+        }
+        return positions.HasPositions, nil
+    }
+
+    func (c *BurrowClient) GetSuppliedTokens(accountID string) ([]string, error) {
+        positions, err := c.GetPositions(accountID)
+        if err != nil {
+            return nil, err
+        }
+        
+        tokens := make([]string, len(positions.Supplied))
+        for i, pos := range positions.Supplied {
+            tokens[i] = pos.TokenID
+        }
+        
+        return tokens, nil
+    }
+
+    func (c *BurrowClient) GetUnclaimedRewards(accountID string) ([]FarmReward, error) {
+        positions, err := c.GetPositions(accountID)
+        if err != nil {
+            return nil, err
+        }
+        
+        return positions.FarmRewards, nil
+    }
+
+    func main() {
+        client := NewBurrowClient("YOUR_KEY")
+        
+        // Get positions
+        positions, err := client.GetPositions("nameless753.near")
+        if err != nil {
+            panic(err)
+        }
+        
+        fmt.Printf("Has positions: %v\n", positions.HasPositions)
+        fmt.Printf("Supplied assets: %d\n", len(positions.Supplied))
+        fmt.Printf("Collateral: %d\n", len(positions.Collateral))
+        fmt.Printf("Borrowed: %d\n", len(positions.Borrowed))
+        
+        // Display supplied positions
+        fmt.Println("\nSupplied Positions:")
+        for _, pos := range positions.Supplied {
+            fmt.Printf("  - %s: %s\n", pos.TokenID, pos.Balance)
+        }
+        
+        // Display farm rewards
+        fmt.Println("\nFarm Rewards:")
+        for _, reward := range positions.FarmRewards {
+            fmt.Printf("  - Farm: %s\n", reward.FarmTokenID)
+            fmt.Printf("    Reward: %s\n", reward.RewardTokenID)
+            fmt.Printf("    Unclaimed: %s\n", reward.UnclaimedAmount)
+        }
+        
+        // Check if has positions
+        hasPos, err := client.HasPositions("nameless753.near")
+        if err != nil {
+            panic(err)
+        }
+        fmt.Printf("\nAccount has active positions: %v\n", hasPos)
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Response Format
+
+<ResponseField name="has_positions" type="boolean" required>
+  Whether the account has any active positions on Burrow. Returns `true` if the account has supplied, collateral, borrowed, or farm positions.
+</ResponseField>
+
+<ResponseField name="supplied" type="array" required>
+  Array of supplied asset positions. Each position contains:
+  
+  <Expandable title="Position object">
+    <ResponseField name="token_id" type="string">
+      The token contract ID (e.g., `lst.rhealab.near`, `wrap.near`, `usdt.tether-token.near`)
+    </ResponseField>
+    <ResponseField name="balance" type="string">
+      Raw token balance supplied (in smallest token unit, no decimals applied)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="collateral" type="array" required>
+  Array of assets used as collateral. Uses same structure as `supplied` positions. Empty array if no collateral is locked.
+</ResponseField>
+
+<ResponseField name="borrowed" type="array" required>
+  Array of borrowed asset positions. Uses same structure as `supplied` positions. Empty array if nothing is borrowed.
+</ResponseField>
+
+<ResponseField name="farm_rewards" type="array" required>
+  Array of unclaimed farm rewards. Each reward contains:
+  
+  <Expandable title="Farm reward object">
+    <ResponseField name="farm_token_id" type="string">
+      The token ID of the farm (asset being farmed)
+    </ResponseField>
+    <ResponseField name="reward_token_id" type="string">
+      The token ID of the reward being earned
+    </ResponseField>
+    <ResponseField name="unclaimed_amount" type="string">
+      Raw amount of unclaimed rewards (in smallest token unit)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Success Response (200 OK)
+
+**Account with Active Positions:**
+```json
+{
+  "has_positions": true,
+  "supplied": [
+    {
+      "token_id": "lst.rhealab.near",
+      "balance": "25829974767408"
+    }
+  ],
+  "collateral": [],
+  "borrowed": [],
+  "farm_rewards": [
+    {
+      "farm_token_id": "lst.rhealab.near",
+      "reward_token_id": "lst.rhealab.near",
+      "unclaimed_amount": "20586823296"
+    }
+  ]
+}
+```
+
+**Account without Positions:**
+```json
+{
+  "has_positions": false,
+  "supplied": [],
+  "collateral": [],
+  "borrowed": [],
+  "farm_rewards": []
+}
+```
+
+**Account with Leveraged Position:**
+```json
+{
+  "has_positions": true,
+  "supplied": [
+    {
+      "token_id": "wrap.near",
+      "balance": "5000000000000000000000000"
+    }
+  ],
+  "collateral": [
+    {
+      "token_id": "wrap.near",
+      "balance": "5000000000000000000000000"
+    }
+  ],
+  "borrowed": [
+    {
+      "token_id": "usdt.tether-token.near",
+      "balance": "3000000000"
+    }
+  ],
+  "farm_rewards": []
+}
+```
+
+<Check>
+  A `200 OK` status code indicates the positions were retrieved successfully. Accounts without positions will return empty arrays.
+</Check>
+
+## Understanding Burrow Protocol
+
+<AccordionGroup>
+  <Accordion title="Supply & Earn" icon="piggy-bank">
+    Supply assets to Burrow to earn interest from borrowers:
+    
+    - **Supplied**: Assets deposited into Burrow pools
+    - **APY**: Variable interest rate based on utilization
+    - **Rewards**: Additional token incentives (farm rewards)
+    
+    ```javascript
+    // Calculate total supplied value
+    const totalSupplied = positions.supplied.reduce((sum, pos) => {
+      // Note: Need to apply token decimals for human-readable value
+      return sum + BigInt(pos.balance);
+    }, BigInt(0));
+    
+    console.log(`Total supplied (raw): ${totalSupplied}`);
+    ```
+    
+    <Tip>
+      Raw balances don't include decimal places. For display, you need to fetch token metadata to get the decimals value.
+    </Tip>
+  </Accordion>
+  
+  <Accordion title="Collateral & Borrowing" icon="scale-balanced">
+    Use supplied assets as collateral to borrow other assets:
+    
+    - **Collateral**: Assets locked to secure loans
+    - **Borrowed**: Assets taken as loans against collateral
+    - **Health Factor**: Ratio of collateral value to borrowed value
+    - **Liquidation**: Occurs when health factor drops too low
+    
+    ```javascript
+    // Check borrowing position
+    const isLeveraged = 
+      positions.collateral.length > 0 && 
+      positions.borrowed.length > 0;
+    
+    if (isLeveraged) {
+      console.log('⚠️  Account has active loan');
+      console.log(`Collateral: ${positions.collateral.length} assets`);
+      console.log(`Borrowed: ${positions.borrowed.length} assets`);
+    }
+    ```
+    
+    <Warning>
+      Monitor health factor closely. Accounts can be liquidated if collateral value drops below required thresholds.
+    </Warning>
+  </Accordion>
+  
+  <Accordion title="Farm Rewards" icon="tractor">
+    Earn additional rewards by participating in liquidity mining:
+    
+    - **Farm Token**: The asset you're farming (usually what you supplied)
+    - **Reward Token**: The token you're earning (incentives)
+    - **Unclaimed**: Rewards ready to be claimed
+    - **Auto-compounding**: Some farms automatically reinvest rewards
+    
+    ```javascript
+    // List all unclaimed rewards
+    positions.farm_rewards.forEach(farm => {
+      console.log(`\n🌾 Farm: ${farm.farm_token_id}`);
+      console.log(`   Earning: ${farm.reward_token_id}`);
+      console.log(`   Unclaimed: ${farm.unclaimed_amount}`);
+    });
+    
+    // Total unclaimed reward value (same token)
+    const totalUnclaimed = positions.farm_rewards
+      .filter(f => f.reward_token_id === 'lst.rhealab.near')
+      .reduce((sum, f) => sum + BigInt(f.unclaimed_amount), BigInt(0));
+    ```
+  </Accordion>
+  
+  <Accordion title="Token Balance Precision" icon="calculator">
+    Understanding raw balance values:
+    
+    All balances are returned as raw integers without decimal places applied. To convert to human-readable values:
+    
+    ```javascript
+    // Example: Convert raw balance to readable format
+    async function formatBalance(tokenId, rawBalance) {
+      // Fetch token metadata to get decimals
+      const metadata = await fetch(
+        `https://api.shadowcorp.dev/v1/tokens/${tokenId}/metadata`,
+        { headers: { 'X-API-Key': 'YOUR_KEY' } }
+      ).then(r => r.json());
+      
+      const decimals = metadata.decimals || 18;
+      const divisor = BigInt(10 ** decimals);
+      const balance = BigInt(rawBalance);
+      
+      // Convert to float for display
+      const readable = Number(balance) / Number(divisor);
+      
+      return {
+        raw: rawBalance,
+        formatted: readable.toFixed(decimals),
+        symbol: metadata.symbol
+      };
+    }
+    
+    // Usage
+    const position = positions.supplied[0];
+    const formatted = await formatBalance(
+      position.token_id, 
+      position.balance
+    );
+    
+    console.log(`${formatted.formatted} ${formatted.symbol}`);
+    // Output: "25.829974767408 LST" (example)
+    ```
+    
+    <Note>
+      Most NEAR tokens use 18 decimals, but always fetch the actual decimals value from token metadata.
+    </Note>
+  </Accordion>
+</AccordionGroup>
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Portfolio Tracking" icon="chart-line" color="#3b82f6">
+    Monitor user DeFi positions across supplied, borrowed, and farmed assets.
+  </Card>
+  
+  <Card title="Liquidation Monitoring" icon="triangle-exclamation" color="#ef4444">
+    Track health factors and alert users before liquidation events.
+  </Card>
+  
+  <Card title="Yield Optimization" icon="rocket" color="#10b981">
+    Compare APYs and farm rewards to optimize earning strategies.
+  </Card>
+  
+  <Card title="Risk Analysis" icon="shield-check" color="#f59e0b">
+    Analyze leverage ratios and collateral diversification.
+  </Card>
+</CardGroup>
+
+## Advanced Example: Position Monitor
+
+Here's a complete example of a Burrow position monitoring tool:
+
+```javascript
+class BurrowPositionMonitor {
+  constructor(apiKey) {
+    this.apiKey = apiKey;
+    this.baseUrl = 'https://api.shadowcorp.dev';
+  }
+
+  async getPositions(accountId) {
+    const response = await fetch(
+      `${this.baseUrl}/v1/accounts/${accountId}/burrow`,
+      {
+        headers: { 'X-API-Key': this.apiKey }
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch positions: ${response.statusText}`);
+    }
+
+    return await response.json();
+  }
+
+  async getTokenMetadata(tokenId) {
+    const response = await fetch(
+      `${this.baseUrl}/v1/tokens/${tokenId}/metadata`,
+      {
+        headers: { 'X-API-Key': this.apiKey }
+      }
+    );
+    return await response.json();
+  }
+
+  formatBalance(rawBalance, decimals = 18) {
+    const divisor = BigInt(10 ** decimals);
+    const balance = BigInt(rawBalance);
+    return Number(balance) / Number(divisor);
+  }
+
+  async generateReport(accountId) {
+    console.log(`\n${'='.repeat(70)}`);
+    console.log(`Burrow Position Report: ${accountId}`);
+    console.log('='.repeat(70));
+
+    const positions = await this.getPositions(accountId);
+
+    if (!positions.has_positions) {
+      console.log('\n❌ No active positions found');
+      console.log('='.repeat(70) + '\n');
+      return;
+    }
+
+    // Supplied Assets
+    if (positions.supplied.length > 0) {
+      console.log('\n💰 Supplied Assets:');
+      console.log('-'.repeat(70));
+      
+      for (const pos of positions.supplied) {
+        const metadata = await this.getTokenMetadata(pos.token_id);
+        const formatted = this.formatBalance(
+          pos.balance, 
+          metadata.decimals || 18
+        );
+        console.log(
+          `   ${pos.token_id.padEnd(35)} ${formatted.toFixed(6)} ${metadata.symbol || ''}`
+        );
+      }
+    }
+
+    // Collateral
+    if (positions.collateral.length > 0) {
+      console.log('\n🔒 Collateral:');
+      console.log('-'.repeat(70));
+      
+      for (const pos of positions.collateral) {
+        const metadata = await this.getTokenMetadata(pos.token_id);
+        const formatted = this.formatBalance(
+          pos.balance,
+          metadata.decimals || 18
+        );
+        console.log(
+          `   ${pos.token_id.padEnd(35)} ${formatted.toFixed(6)} ${metadata.symbol || ''}`
+        );
+      }
+    }
+
+    // Borrowed
+    if (positions.borrowed.length > 0) {
+      console.log('\n📊 Borrowed:');
+      console.log('-'.repeat(70));
+      
+      for (const pos of positions.borrowed) {
+        const metadata = await this.getTokenMetadata(pos.token_id);
+        const formatted = this.formatBalance(
+          pos.balance,
+          metadata.decimals || 18
+        );
+        console.log(
+          `   ${pos.token_id.padEnd(35)} ${formatted.toFixed(6)} ${metadata.symbol || ''}`
+        );
+      }
+    }
+
+    // Farm Rewards
+    if (positions.farm_rewards.length > 0) {
+      console.log('\n🌾 Unclaimed Farm Rewards:');
+      console.log('-'.repeat(70));
+      
+      for (const reward of positions.farm_rewards) {
+        const metadata = await this.getTokenMetadata(reward.reward_token_id);
+        const formatted = this.formatBalance(
+          reward.unclaimed_amount,
+          metadata.decimals || 18
+        );
+        console.log(`   Farm: ${reward.farm_token_id}`);
+        console.log(
+          `   Reward: ${formatted.toFixed(6)} ${metadata.symbol || reward.reward_token_id}\n`
+        );
+      }
+    }
+
+    // Position Summary
+    console.log('\n📈 Position Summary:');
+    console.log('-'.repeat(70));
+    console.log(`   Supplied assets: ${positions.supplied.length}`);
+    console.log(`   Collateral: ${positions.collateral.length}`);
+    console.log(`   Borrowed: ${positions.borrowed.length}`);
+    console.log(`   Active farms: ${positions.farm_rewards.length}`);
+    
+    // Risk indicator
+    const isLeveraged = 
+      positions.collateral.length > 0 && 
+      positions.borrowed.length > 0;
+    
+    if (isLeveraged) {
+      console.log(`   ⚠️  Leveraged position detected`);
+    } else if (positions.supplied.length > 0) {
+      console.log(`   ✅ Simple supply position (low risk)`);
+    }
+
+    console.log('='.repeat(70) + '\n');
+
+    return positions;
+  }
+
+  async comparePositions(accountIds) {
+    console.log(`\n${'='.repeat(70)}`);
+    console.log('Burrow Position Comparison');
+    console.log('='.repeat(70));
+    console.log(
+      'Account'.padEnd(30) +
+      'Supplied'.padEnd(15) +
+      'Borrowed'.padEnd(15) +
+      'Farms'
+    );
+    console.log('-'.repeat(70));
+
+    for (const accountId of accountIds) {
+      try {
+        const positions = await this.getPositions(accountId);
+        
+        const displayId = accountId.length > 28 
+          ? accountId.substring(0, 25) + '...'
+          : accountId;
+        
+        console.log(
+          displayId.padEnd(30) +
+          positions.supplied.length.toString().padEnd(15) +
+          positions.borrowed.length.toString().padEnd(15) +
+          positions.farm_rewards.length.toString()
+        );
+      } catch (error) {
+        console.log(
+          accountId.padEnd(30) +
+          'Error fetching data'
+        );
+      }
+    }
+
+    console.log('='.repeat(70) + '\n');
+  }
+
+  async watchPosition(accountId, intervalMs = 60000) {
+    console.log(`\n👀 Watching ${accountId} (refresh every ${intervalMs / 1000}s)...`);
+    console.log('Press Ctrl+C to stop\n');
+
+    const check = async () => {
+      try {
+        const positions = await this.getPositions(accountId);
+        const timestamp = new Date().toLocaleTimeString();
+        
+        console.log(`[${timestamp}] Position check:`);
+        console.log(`  Supplied: ${positions.supplied.length}`);
+        console.log(`  Collateral: ${positions.collateral.length}`);
+        console.log(`  Borrowed: ${positions.borrowed.length}`);
+        console.log(`  Unclaimed rewards: ${positions.farm_rewards.length}\n`);
+        
+        // Alert on risky positions
+        if (positions.borrowed.length > 0 && positions.collateral.length === 0) {
+          console.log('  ⚠️  WARNING: Borrowed without collateral!\n');
+        }
+      } catch (error) {
+        console.error(`  ❌ Error: ${error.message}\n`);
+      }
+    };
+
+    // Initial check
+    await check();
+    
+    // Periodic checks
+    return setInterval(check, intervalMs);
+  }
+}
+
+// Usage Examples
+const monitor = new BurrowPositionMonitor('YOUR_KEY');
+
+// Generate detailed report
+await monitor.generateReport('nameless753.near');
+
+// Compare multiple accounts
+await monitor.comparePositions([
+  'nameless753.near',
+  'example.near',
+  'trader.near'
+]);
+
+// Watch position in real-time (updates every minute)
+const watcher = await monitor.watchPosition('nameless753.near', 60000);
+
+// Stop watching after 5 minutes
+setTimeout(() => {
+  clearInterval(watcher);
+  console.log('Stopped watching position');
+}, 5 * 60 * 1000);
+```
+
+## Risk Assessment
+
+Calculate basic risk metrics for Burrow positions:
+
+```javascript
+async function assessRisk(accountId) {
+  const positions = await fetch(
+    `https://api.shadowcorp.dev/v1/accounts/${accountId}/burrow`,
+    { headers: { 'X-API-Key': 'YOUR_KEY' } }
+  ).then(r => r.json());
+
+  if (!positions.has_positions) {
+    return { level: 'NONE', message: 'No active positions' };
+  }
+
+  // Risk factors
+  const hasSupplied = positions.supplied.length > 0;
+  const hasCollateral = positions.collateral.length > 0;
+  const hasBorrowed = positions.borrowed.length > 0;
+  const hasFarms = positions.farm_rewards.length > 0;
+
+  // Risk assessment
+  if (hasBorrowed && !hasCollateral) {
+    return {
+      level: 'CRITICAL',
+      message: '🔴 Borrowed without collateral - immediate risk',
+      details: {
+        supplied: positions.supplied.length,
+        borrowed: positions.borrowed.length,
+        collateral: 0
+      }
+    };
+  }
+
+  if (hasBorrowed && hasCollateral) {
+    return {
+      level: 'MEDIUM',
+      message: '🟡 Leveraged position - monitor health factor',
+      details: {
+        supplied: positions.supplied.length,
+        borrowed: positions.borrowed.length,
+        collateral: positions.collateral.length
+      }
+    };
+  }
+
+  if (hasSupplied && hasFarms) {
+    return {
+      level: 'LOW',
+      message: '🟢 Earning yield with farm rewards',
+      details: {
+        supplied: positions.supplied.length,
+        farms: positions.farm_rewards.length
+      }
+    };
+  }
+
+  if (hasSupplied) {
+    return {
+      level: 'LOW',
+      message: '🟢 Simple supply position',
+      details: {
+        supplied: positions.supplied.length
+      }
+    };
+  }
+
+  return {
+    level: 'NONE',
+    message: 'No risk assessment available'
+  };
+}
+
+// Usage
+const risk = await assessRisk('nameless753.near');
+console.log(`Risk Level: ${risk.level}`);
+console.log(risk.message);
+console.log('Details:', risk.details);
+```
+
+## Error Responses
+
+### 400 Bad Request
+
+```json
+{
+  "error": "Invalid account ID format",
+  "code": 400
+}
+```
+
+<Warning>
+  Ensure the account ID follows NEAR naming conventions (e.g., `account.near` or `subaccount.parent.near`).
+</Warning>
+
+### 401 Unauthorized
+
+```json
+{
+  "error": "Missing or invalid API key",
+  "code": 401
+}
+```
+
+### 404 Not Found
+
+```json
+{
+  "error": "Account not found",
+  "code": 404,
+  "account_id": "invalid.near"
+}
+```
+
+<Note>
+  A 404 error means the account does not exist on NEAR. Accounts without Burrow positions will return a successful response with `has_positions: false`.
+</Note>
+
+### 500 Internal Server Error
+
+```json
+{
+  "error": "Failed to fetch Burrow positions",
+  "code": 500
+}
+```
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+  <Card 
+    title="Accounts" 
+    icon="user-circle" 
+    href="/shadow-api/endpoints/accounts"
+  >
+    Get complete account data including balance and tokens
+  </Card>
+  
+  <Card 
+    title="Tokens" 
+    icon="coin" 
+    href="/shadow-api/endpoints/tokens"
+  >
+    Fetch metadata for supplied/borrowed tokens
+  </Card>
+  
+  <Card 
+    title="FT Transfers" 
+    icon="coins" 
+    href="/shadow-api/endpoints/ft-transfers"
+  >
+    Track token movements to/from Burrow
+  </Card>
+  
+  <Card 
+    title="Account Balance" 
+    icon="wallet" 
+    href="/shadow-api/endpoints/account-balance"
+  >
+    Check native NEAR balance
+  </Card>
+</CardGroup>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Polling Strategy" icon="clock">
+    When monitoring positions, implement smart polling to reduce API calls:
+    
+    ```javascript
+    class SmartPositionPoller {
+      constructor(apiKey, accountId) {
+        this.apiKey = apiKey;
+        this.accountId = accountId;
+        this.lastPositions = null;
+        this.pollInterval = 30000; // 30 seconds default
+      }
+      
+      async poll() {
+        const positions = await this.getPositions();
+        
+        // Detect changes
+        if (this.hasChanged(positions)) {
+          console.log('🔔 Position changed!');
+          this.onPositionChange(positions);
+        }
+        
+        this.lastPositions = positions;
+        return positions;
+      }
+      
+      hasChanged(newPositions) {
+        if (!this.lastPositions) return true;
+        
+        return (
+          JSON.stringify(this.lastPositions.supplied) !== 
+          JSON.stringify(newPositions.supplied) ||
+          JSON.stringify(this.lastPositions.borrowed) !== 
+          JSON.stringify(newPositions.borrowed)
+        );
+      }
+      
+      async getPositions() {
+        const response = await fetch(
+          `https://api.shadowcorp.dev/v1/accounts/${this.accountId}/burrow`,
+          { headers: { 'X-API-Key': this.apiKey } }
+        );
+        return await response.json();
+      }
+      
+      onPositionChange(positions) {
+        // Custom handler for position changes
+        console.log('New supplied count:', positions.supplied.length);
+        console.log('New borrowed count:', positions.borrowed.length);
+      }
+      
+      start() {
+        this.poll(); // Initial poll
+        this.intervalId = setInterval(() => this.poll(), this.pollInterval);
+      }
+      
+      stop() {
+        if (this.intervalId) {
+          clearInterval(this.intervalId);
+          console.log('Polling stopped');
+        }
+      }
+    }
+    
+    // Usage
+    const poller = new SmartPositionPoller('YOUR_KEY', 'nameless753.near');
+    poller.start();
+    ```
+  </Accordion>
+  
+  <Accordion title="Balance Conversion" icon="calculator">
+    Always convert raw balances using the correct decimals:
+    
+    ```javascript
+    class BalanceConverter {
+      constructor(apiKey) {
+        this.apiKey = apiKey;
+        this.metadataCache = new Map();
+      }
+      
+      async getTokenDecimals(tokenId) {
+        if (this.metadataCache.has(tokenId)) {
+          return this.metadataCache.get(tokenId);
+        }
+        
+        const metadata = await fetch(
+          `https://api.shadowcorp.dev/v1/tokens/${tokenId}/metadata`,
+          { headers: { 'X-API-Key': this.apiKey } }
+        ).then(r => r.json());
+        
+        const decimals = metadata.decimals || 18;
+        this.metadataCache.set(tokenId, decimals);
+        return decimals;
+      }
+      
+      async convertPosition(position) {
+        const decimals = await this.getTokenDecimals(position.token_id);
+        const divisor = BigInt(10 ** decimals);
+        const balance = BigInt(position.balance);
+        
+        return {
+          tokenId: position.token_id,
+          rawBalance: position.balance,
+          decimals: decimals,
+          humanReadable: (Number(balance) / Number(divisor)).toFixed(6)
+        };
+      }
+      
+      async convertAllPositions(positions) {
+        const converted = {
+          supplied: [],
+          collateral: [],
+          borrowed: [],
+          farmRewards: []
+        };
+        
+        for (const pos of positions.supplied) {
+          converted.supplied.push(await this.convertPosition(pos));
+        }
+        
+        for (const pos of positions.collateral) {
+          converted.collateral.push(await this.convertPosition(pos));
+        }
+        
+        for (const pos of positions.borrowed) {
+          converted.borrowed.push(await this.convertPosition(pos));
+        }
+        
+        for (const reward of positions.farm_rewards) {
+          const decimals = await this.getTokenDecimals(reward.reward_token_id);
+          const divisor = BigInt(10 ** decimals);
+          const amount = BigInt(reward.unclaimed_amount);
+          
+          converted.farmRewards.push({
+            farmTokenId: reward.farm_token_id,
+            rewardTokenId: reward.reward_token_id,
+            rawAmount: reward.unclaimed_amount,
+            humanReadable: (Number(amount) / Number(divisor)).toFixed(6)
+          });
+        }
+        
+        return converted;
+      }
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Error Handling" icon="shield-halved">
+    Implement robust error handling for production applications:
+    
+    ```javascript
+    async function safeGetBurrowPositions(accountId, apiKey) {
+      try {
+        const response = await fetch(
+          `https://api.shadowcorp.dev/v1/accounts/${accountId}/burrow`,
+          {
+            headers: { 'X-API-Key': apiKey },
+            signal: AbortSignal.timeout(10000) // 10s timeout
+          }
+        );
+        
+        if (!response.ok) {
+          if (response.status === 404) {
+            return {
+              success: false,
+              error: 'Account not found',
+              data: null
+            };
+          }
+          
+          if (response.status === 401) {
+            return {
+              success: false,
+              error: 'Invalid API key',
+              data: null
+            };
+          }
+          
+          if (response.status === 429) {
+            return {
+              success: false,
+              error: 'Rate limit exceeded',
+              data: null,
+              retryAfter: response.headers.get('Retry-After')
+            };
+          }
+          
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        return {
+          success: true,
+          error: null,
+          data: data
+        };
+        
+      } catch (error) {
+        if (error.name === 'TimeoutError') {
+          return {
+            success: false,
+            error: 'Request timeout',
+            data: null
+          };
+        }
+        
+        return {
+          success: false,
+          error: error.message,
+          data: null
+        };
+      }
+    }
+    
+    // Usage with retry logic
+    async function getBurrowPositionsWithRetry(accountId, apiKey, maxRetries = 3) {
+      for (let i = 0; i < maxRetries; i++) {
+        const result = await safeGetBurrowPositions(accountId, apiKey);
+        
+        if (result.success) {
+          return result.data;
+        }
+        
+        if (result.error === 'Rate limit exceeded' && result.retryAfter) {
+          const delay = parseInt(result.retryAfter) * 1000;
+          console.log(`Rate limited. Retrying after ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+        
+        if (i < maxRetries - 1) {
+          const backoff = Math.pow(2, i) * 1000;
+          console.log(`Attempt ${i + 1} failed. Retrying in ${backoff}ms...`);
+          await new Promise(resolve => setTimeout(resolve, backoff));
+        }
+      }
+      
+      throw new Error('Max retries exceeded');
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Performance Optimization" icon="gauge-high">
+    Optimize API calls when dealing with multiple accounts:
+    
+    ```javascript
+    class BurrowBatchProcessor {
+      constructor(apiKey, batchSize = 5) {
+        this.apiKey = apiKey;
+        this.batchSize = batchSize;
+      }
+      
+      async processBatch(accountIds) {
+        const results = new Map();
+        
+        // Process in batches to avoid overwhelming the API
+        for (let i = 0; i < accountIds.length; i += this.batchSize) {
+          const batch = accountIds.slice(i, i + this.batchSize);
+          
+          const batchPromises = batch.map(async (accountId) => {
+            try {
+              const response = await fetch(
+                `https://api.shadowcorp.dev/v1/accounts/${accountId}/burrow`,
+                { headers: { 'X-API-Key': this.apiKey } }
+              );
+              const data = await response.json();
+              return { accountId, data, success: true };
+            } catch (error) {
+              return { accountId, error: error.message, success: false };
+            }
+          });
+          
+          const batchResults = await Promise.all(batchPromises);
+          
+          batchResults.forEach(result => {
+            results.set(result.accountId, result);
+          });
+          
+          // Small delay between batches
+          if (i + this.batchSize < accountIds.length) {
+            await new Promise(resolve => setTimeout(resolve, 200));
+          }
+        }
+        
+        return results;
+      }
+      
+      async getActivePositions(accountIds) {
+        const results = await this.processBatch(accountIds);
+        const active = [];
+        
+        results.forEach((result, accountId) => {
+          if (result.success && result.data.has_positions) {
+            active.push({
+              accountId,
+              positions: result.data
+            });
+          }
+        });
+        
+        return active;
+      }
+    }
+    
+    // Usage
+    const processor = new BurrowBatchProcessor('YOUR_KEY');
+    const accounts = [
+      'alice.near',
+      'bob.near',
+      'charlie.near',
+      // ... more accounts
+    ];
+    
+    const activePositions = await processor.getActivePositions(accounts);
+    console.log(`Found ${activePositions.length} accounts with positions`);
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Integration Examples
+
+<Tabs>
+  <Tab title="React Hook">
+    ```typescript
+    import { useState, useEffect } from 'react';
+    
+    interface BurrowPositions {
+      has_positions: boolean;
+      supplied: Array<{ token_id: string; balance: string }>;
+      collateral: Array<{ token_id: string; balance: string }>;
+      borrowed: Array<{ token_id: string; balance: string }>;
+      farm_rewards: Array<{
+        farm_token_id: string;
+        reward_token_id: string;
+        unclaimed_amount: string;
+      }>;
+    }
+    
+    export function useBurrowPositions(accountId: string, apiKey: string) {
+      const [positions, setPositions] = useState<BurrowPositions | null>(null);
+      const [loading, setLoading] = useState(true);
+      const [error, setError] = useState<string | null>(null);
+      
+      useEffect(() => {
+        let mounted = true;
+        
+        async function fetchPositions() {
+          try {
+            setLoading(true);
+            const response = await fetch(
+              `https://api.shadowcorp.dev/v1/accounts/${accountId}/burrow`,
+              {
+                headers: { 'X-API-Key': apiKey }
+              }
+            );
+            
+            if (!response.ok) {
+              throw new Error(`HTTP ${response.status}`);
+            }
+            
+            const data = await response.json();
+            
+            if (mounted) {
+              setPositions(data);
+              setError(null);
+            }
+          } catch (err) {
+            if (mounted) {
+              setError(err instanceof Error ? err.message : 'Unknown error');
+            }
+          } finally {
+            if (mounted) {
+              setLoading(false);
+            }
+          }
+        }
+        
+        fetchPositions();
+        
+        return () => {
+          mounted = false;
+        };
+      }, [accountId, apiKey]);
+      
+      return { positions, loading, error };
+    }
+    
+    // Usage in component
+    function BurrowDashboard({ accountId }: { accountId: string }) {
+      const { positions, loading, error } = useBurrowPositions(
+        accountId,
+        'YOUR_KEY'
+      );
+      
+      if (loading) return <div>Loading positions...</div>;
+      if (error) return <div>Error: {error}</div>;
+      if (!positions?.has_positions) return <div>No positions found</div>;
+      
+      return (
+        <div>
+          <h2>Burrow Positions</h2>
+          <div>Supplied: {positions.supplied.length}</div>
+          <div>Borrowed: {positions.borrowed.length}</div>
+          <div>Farm Rewards: {positions.farm_rewards.length}</div>
+        </div>
+      );
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Vue Composable">
+    ```typescript
+    import { ref, watchEffect } from 'vue';
+    
+    export function useBurrowPositions(accountId: string, apiKey: string) {
+      const positions = ref(null);
+      const loading = ref(true);
+      const error = ref(null);
+      
+      watchEffect(async () => {
+        try {
+          loading.value = true;
+          error.value = null;
+          
+          const response = await fetch(
+            `https://api.shadowcorp.dev/v1/accounts/${accountId}/burrow`,
+            {
+              headers: { 'X-API-Key': apiKey }
+            }
+          );
+          
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+          
+          positions.value = await response.json();
+        } catch (err) {
+          error.value = err.message;
+        } finally {
+          loading.value = false;
+        }
+      });
+      
+      return { positions, loading, error };
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Notes
+
+<Info>
+  **Token Decimals**: All balance values are in the smallest token unit. Always fetch token metadata to get the correct decimals for display.
+</Info>
+
+<Warning>
+  **Liquidation Risk**: Accounts with borrowed positions should be monitored regularly. Health factors can change quickly based on market conditions.
+</Warning>
+
+<Tip>
+  **Farm Rewards**: Rewards accumulate over time. Consider implementing notifications when unclaimed rewards reach a certain threshold.
+</Tip>
+
+<Note>
+  **Empty Arrays**: Accounts without specific position types (e.g., no borrowed assets) will return empty arrays for those fields, not `null`.
+</Note>

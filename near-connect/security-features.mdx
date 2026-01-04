@@ -1,0 +1,664 @@
+---
+title: "Security Features"
+description: "NearConnect implements multiple security layers that work together to protect users from malicious transactions, phishing attacks, and other threats. This defense-in-depth approach provides comprehensive protection beyond basic iframe sandboxing."
+icon: shield
+---
+
+import { Callout } from '@/components/ui/callout'
+
+# Security Features
+
+<Callout type="warning">
+**Security First**: All security features are enabled by default. While they can be configured, we strongly recommend keeping them enabled for production applications.
+</Callout>
+
+## Security Architecture
+
+NearConnect's security model consists of six complementary layers:
+
+1. **Transaction Guard** - Analyzes and validates transactions before signing
+2. **Origin Guard** - Validates message origins and callback URLs
+3. **Rate Limiter** - Prevents abuse through request throttling
+4. **Audit Log** - Tracks all wallet actions for investigation
+5. **Secure Storage** - AES-GCM encrypted localStorage
+6. **Content Security Policy** - HTTP header configuration helpers
+
+## Transaction Guard
+
+The Transaction Guard analyzes transactions before signing to detect dangerous operations and potential scams.
+
+### Basic Usage
+
+```typescript
+import {
+  TransactionGuard,
+  createDefaultTransactionGuard
+} from "@shadowcorp/near-connect";
+
+// Use default configuration
+const guard = createDefaultTransactionGuard();
+
+// Analyze transaction risk
+const risk = guard.analyzeRisk({
+  receiverId: "contract.near",
+  actions: [
+    {
+      type: "FunctionCall",
+      params: {
+        methodName: "transfer",
+        args: { amount: "1000" }
+      }
+    }
+  ]
+});
+
+console.log("Risk level:", risk.level); // "low" | "medium" | "high" | "critical"
+console.log("Reasons:", risk.reasons);
+
+// Validate before signing
+const result = guard.validate(transaction);
+if (!result.valid) {
+  console.error("Transaction blocked:", result.error);
+  console.error("Risk level:", result.risk.level);
+}
+```
+
+### What It Detects
+
+The Transaction Guard identifies multiple threat categories:
+
+**Dangerous Methods**
+- `add_full_access_key` - Could grant attacker full account control
+- `delete_account` - Irreversible account deletion
+- `deploy_contract` - Could replace contract with malicious code
+- Other high-risk contract methods
+
+**Large Transfers**
+- Configurable threshold (default: 100 NEAR)
+- Warns users about significant value transfers
+- Requires explicit confirmation
+
+**Known Scam Contracts**
+- Maintains blocklist of reported scam contracts
+- Updates regularly from threat intelligence
+- Prevents interaction with known malicious contracts
+
+**Account Deletion**
+- Blocks `DeleteAccount` actions
+- Requires separate confirmation flow
+
+### Custom Configuration
+
+```typescript
+const guard = new TransactionGuard({
+  // Set transfer warning threshold
+  largeTransferThreshold: "50000000000000000000000000", // 50 NEAR
+  
+  // Custom blocklist
+  blocklist: [
+    "known-scam.near",
+    "phishing-site.near"
+  ],
+  
+  // Custom allowlist (bypasses checks)
+  allowlist: [
+    "trusted-contract.near",
+    "official-bridge.near"
+  ],
+  
+  // Custom dangerous methods
+  dangerousMethods: [
+    "add_full_access_key",
+    "delete_account",
+    "custom_dangerous_method"
+  ]
+});
+```
+
+### Risk Levels
+
+```typescript
+// Risk level determines UI treatment
+switch (risk.level) {
+  case "critical":
+    // Block transaction entirely
+    throw new Error("Transaction blocked for security");
+    
+  case "high":
+    // Show strong warning, require explicit confirmation
+    await showWarningDialog(risk.reasons);
+    break;
+    
+  case "medium":
+    // Show standard warning
+    await showCautionDialog(risk.reasons);
+    break;
+    
+  case "low":
+    // Proceed normally
+    break;
+}
+```
+
+## Origin Guard
+
+The Origin Guard validates postMessage origins and callback URLs to prevent cross-site attacks and phishing.
+
+### Basic Usage
+
+```typescript
+import {
+  OriginGuard,
+  createSecureMessageHandler
+} from "@shadowcorp/near-connect";
+
+const guard = new OriginGuard({
+  // Your application origins
+  appOrigins: [
+    "https://myapp.com",
+    "https://www.myapp.com"
+  ],
+  
+  // Known wallet origins (pre-configured for popular wallets)
+  walletOrigins: {
+    "meteor-wallet": ["https://wallet.meteorwallet.app"],
+    "custom-wallet": ["https://custom.wallet"]
+  }
+});
+
+// Check if origin is trusted
+const isTrusted = guard.isOriginTrusted("https://wallet.meteorwallet.app");
+console.log("Is trusted:", isTrusted); // true
+
+// Validate callback URLs
+const result = guard.verifyCallbackUrl("https://myapp.com/callback");
+if (!result.valid) {
+  console.error("Invalid callback:", result.reason);
+}
+```
+
+### Secure Message Handler
+
+Create a postMessage handler that only accepts messages from trusted origins:
+
+```typescript
+const handler = createSecureMessageHandler({
+  trustedOrigins: [
+    "https://wallet.meteorwallet.app",
+    "https://app.mynearwallet.com"
+  ],
+  
+  onMessage: (data, origin) => {
+    // Only called for verified origins
+    console.log("Received message from:", origin);
+    console.log("Data:", data);
+  },
+  
+  onInvalidOrigin: (origin) => {
+    // Log security violation
+    console.warn("Rejected message from untrusted origin:", origin);
+  }
+});
+
+// Add to window
+window.addEventListener("message", handler);
+```
+
+### Callback URL Verification
+
+```typescript
+// Verify before redirecting
+const callbackUrl = "https://myapp.com/auth/callback";
+const verification = guard.verifyCallbackUrl(callbackUrl);
+
+if (verification.valid) {
+  // Safe to redirect
+  window.location.href = callbackUrl;
+} else {
+  console.error("Invalid callback:", verification.reason);
+  // Show error to user
+}
+```
+
+## Rate Limiter
+
+Prevents abuse by limiting request frequency with configurable windows and automatic blocking.
+
+### Pre-configured Limiters
+
+```typescript
+import {
+  connectLimiter,
+  signLimiter,
+  RateLimiter
+} from "@shadowcorp/near-connect";
+
+// Check connect attempts (5 per minute)
+const connectResult = connectLimiter.check("wallet-connect");
+if (!connectResult.allowed) {
+  console.log(`Rate limited. Retry in ${connectResult.retryAfter}s`);
+}
+
+// Check signing attempts (10 per minute)
+const signResult = signLimiter.check("sign-transaction");
+if (!signResult.allowed) {
+  console.log(`Too many transactions. Retry in ${signResult.retryAfter}s`);
+}
+```
+
+### Custom Rate Limiter
+
+```typescript
+const customLimiter = new RateLimiter({
+  maxRequests: 20,           // Max 20 requests
+  windowMs: 60000,           // Per 1 minute
+  blockDurationMs: 300000    // Block for 5 minutes if exceeded
+});
+
+async function protectedAction(userId: string) {
+  const result = customLimiter.check(`action:${userId}`);
+  
+  if (!result.allowed) {
+    throw new Error(`Rate limited. Retry in ${result.retryAfter} seconds`);
+  }
+  
+  // Proceed with action
+  await performAction();
+}
+```
+
+### Integration with Transaction Signing
+
+```typescript
+async function signWithRateLimit(transaction) {
+  // Check rate limit
+  const rateCheck = signLimiter.check("sign-tx");
+  
+  if (!rateCheck.allowed) {
+    throw new Error(
+      `Too many transactions. Please wait ${rateCheck.retryAfter} seconds.`
+    );
+  }
+  
+  // Proceed with signing
+  return await connector.signAndSendTransaction(transaction);
+}
+```
+
+## Audit Log
+
+Tracks all wallet actions for security monitoring, compliance, and incident investigation.
+
+### Basic Setup
+
+```typescript
+import {
+  AuditLog,
+  createAuditLog
+} from "@shadowcorp/near-connect";
+
+const auditLog = createAuditLog({
+  consoleLog: true,              // Log to console
+  persist: true,                 // Persist to localStorage
+  remoteEndpoint: "/api/audit"   // Optional: send to server
+});
+
+// Log events
+auditLog.log("wallet:connect", {
+  walletId: "meteor-wallet",
+  accountId: "alice.near"
+});
+
+auditLog.logTransaction("tx:sign", {
+  receiverId: "contract.near",
+  actions: [{ type: "FunctionCall" }]
+});
+
+auditLog.logSecurityWarning("Large transfer detected", {
+  amount: "500 NEAR",
+  receiverId: "unknown.near"
+});
+```
+
+### Event Types
+
+The audit log tracks the following event categories:
+
+**Wallet Events**
+- `wallet:connect` - Wallet connection initiated
+- `wallet:disconnect` - Wallet disconnected
+- `wallet:switch` - Account switched
+
+**Transaction Events**
+- `tx:sign` - Transaction signing requested
+- `tx:broadcast` - Transaction sent to network
+- `tx:blocked` - Transaction blocked by security
+- `tx:failed` - Transaction failed
+
+**Security Events**
+- `security:violation` - Security policy violation
+- `security:warning` - Security warning issued
+- `rate:limited` - Rate limit exceeded
+
+**Hardware Events**
+- `hardware:connect` - Hardware wallet connected
+- `hardware:disconnect` - Hardware wallet disconnected
+- `hardware:error` - Hardware wallet error
+
+### Query Events
+
+```typescript
+// Get all security events
+const securityEvents = auditLog.getSecurityEvents();
+console.log(`${securityEvents.length} security events`);
+
+// Get recent transactions
+const recentTx = auditLog.getEvents({
+  type: ["tx:sign", "tx:broadcast"],
+  limit: 10
+});
+
+// Get events in time range
+const today = auditLog.getEvents({
+  startTime: Date.now() - 86400000,
+  endTime: Date.now()
+});
+```
+
+### Export for Analysis
+
+```typescript
+// Export as JSON
+const jsonData = auditLog.export();
+const blob = new Blob([jsonData], { type: "application/json" });
+const url = URL.createObjectURL(blob);
+
+// Export as CSV
+const csvData = auditLog.exportCsv();
+const csvBlob = new Blob([csvData], { type: "text/csv" });
+```
+
+### Remote Logging
+
+```typescript
+const auditLog = createAuditLog({
+  remoteEndpoint: "/api/audit",
+  persist: false, // Only send to server
+  
+  // Optional: custom headers
+  headers: {
+    "Authorization": "Bearer your-token"
+  }
+});
+
+// Events are automatically sent to remote endpoint
+auditLog.log("wallet:connect", { walletId: "ledger" });
+```
+
+## Secure Storage
+
+AES-GCM encrypted localStorage for sensitive data like session tokens and keys.
+
+### Basic Usage
+
+```typescript
+import {
+  SecureStorage,
+  createSecureStorage
+} from "@shadowcorp/near-connect";
+
+// Create encrypted storage (browser only)
+const storage = await createSecureStorage({
+  keyName: "my-app-encryption-key"
+});
+
+// Store sensitive data
+await storage.set("session-token", JSON.stringify({
+  token: "secret-token-value",
+  expiresAt: Date.now() + 3600000
+}));
+
+// Retrieve data
+const sessionData = await storage.get("session-token");
+const session = JSON.parse(sessionData);
+
+// Remove data
+await storage.remove("session-token");
+
+// Clear all
+await storage.clear();
+```
+
+### How It Works
+
+SecureStorage uses the Web Crypto API to:
+
+1. Generate a non-exportable AES-GCM encryption key
+2. Store the key in IndexedDB (not accessible to JavaScript)
+3. Encrypt data before storing in localStorage
+4. Decrypt data when retrieving
+
+<Callout type="info">
+The encryption key is generated using `crypto.subtle` and stored as a non-exportable CryptoKey, making it impossible for attackers to extract even if they gain access to localStorage.
+</Callout>
+
+### Migration from Plain Storage
+
+```typescript
+async function migrateToSecureStorage() {
+  const secureStorage = await createSecureStorage();
+  
+  // Move sensitive data
+  const oldToken = localStorage.getItem("token");
+  if (oldToken) {
+    await secureStorage.set("token", oldToken);
+    localStorage.removeItem("token");
+  }
+}
+```
+
+## Content Security Policy
+
+Helper functions for generating and validating CSP headers.
+
+### Recommended CSP
+
+```typescript
+import { getRecommendedCSP } from "@shadowcorp/near-connect";
+
+// Get recommended CSP for NEAR apps
+const csp = getRecommendedCSP();
+
+console.log(csp);
+// Output: "default-src 'self'; connect-src 'self' https://rpc.mainnet.near.org; ..."
+```
+
+### Custom CSP Generation
+
+```typescript
+import { generateCSP } from "@shadowcorp/near-connect";
+
+const csp = generateCSP({
+  "default-src": ["'self'"],
+  "script-src": ["'self'", "'unsafe-inline'"],
+  "connect-src": [
+    "'self'",
+    "https://rpc.mainnet.near.org",
+    "https://api.wallet.com"
+  ],
+  "frame-src": [
+    "https://wallet.meteorwallet.app",
+    "https://app.mynearwallet.com"
+  ],
+  "img-src": ["'self'", "data:", "https:"]
+});
+
+// Add to HTML
+// <meta http-equiv="Content-Security-Policy" content="...">
+```
+
+### Security Checklist
+
+```typescript
+import { runSecurityChecklist } from "@shadowcorp/near-connect";
+
+const checks = runSecurityChecklist();
+
+checks.forEach(check => {
+  const icon = check.passed ? "✓" : "✗";
+  console.log(`${icon} ${check.name}: ${check.message}`);
+});
+
+// Example output:
+// ✓ HTTPS: Application served over HTTPS
+// ✓ CSP: Content Security Policy configured
+// ✗ SRI: Subresource Integrity not found
+```
+
+## Using Security Layers Together
+
+Combine all security layers for maximum protection:
+
+```typescript
+import {
+  createDefaultTransactionGuard,
+  createAuditLog,
+  RateLimiter,
+  OriginGuard
+} from "@shadowcorp/near-connect";
+
+class SecureWalletManager {
+  private txGuard = createDefaultTransactionGuard();
+  private auditLog = createAuditLog({ consoleLog: true, persist: true });
+  private rateLimiter = new RateLimiter({ maxRequests: 10, windowMs: 60000 });
+  private originGuard = new OriginGuard({ appOrigins: ["https://myapp.com"] });
+
+  async secureSignTransaction(transaction: any) {
+    // 1. Check rate limit
+    const rateResult = this.rateLimiter.check("sign-tx");
+    if (!rateResult.allowed) {
+      this.auditLog.log("rate:limited", {
+        data: { retryAfter: rateResult.retryAfter }
+      });
+      throw new Error(`Rate limited. Retry in ${rateResult.retryAfter}s`);
+    }
+
+    // 2. Validate transaction security
+    const txResult = this.txGuard.validate(transaction);
+    if (!txResult.valid) {
+      this.auditLog.logTransaction("tx:blocked", {
+        receiverId: transaction.receiverId,
+        error: txResult.error,
+        risk: txResult.risk.level
+      });
+      throw new Error(txResult.error);
+    }
+
+    // 3. Log transaction attempt
+    this.auditLog.logTransaction("tx:sign", {
+      receiverId: transaction.receiverId,
+      risk: txResult.risk.level
+    });
+
+    // 4. Sign transaction
+    try {
+      const result = await connector.signAndSendTransaction(transaction);
+      
+      this.auditLog.logTransaction("tx:broadcast", {
+        receiverId: transaction.receiverId,
+        hash: result.transaction.hash
+      });
+      
+      return result;
+    } catch (error) {
+      this.auditLog.logTransaction("tx:failed", {
+        receiverId: transaction.receiverId,
+        error: error.message
+      });
+      throw error;
+    }
+  }
+
+  validateMessageOrigin(origin: string): boolean {
+    const isValid = this.originGuard.isOriginTrusted(origin);
+    
+    if (!isValid) {
+      this.auditLog.logSecurityWarning("Untrusted origin", { origin });
+    }
+    
+    return isValid;
+  }
+}
+
+// Usage
+const manager = new SecureWalletManager();
+await manager.secureSignTransaction(transaction);
+```
+
+## Security Best Practices
+
+### 1. Always Validate Transactions
+
+```typescript
+// ❌ Don't sign without validation
+await connector.signAndSendTransaction(transaction);
+
+// ✅ Validate first
+const guard = createDefaultTransactionGuard();
+const result = guard.validate(transaction);
+if (result.valid) {
+  await connector.signAndSendTransaction(transaction);
+}
+```
+
+### 2. Implement Rate Limiting
+
+```typescript
+// ❌ Unlimited transaction signing
+async function signTx(tx) {
+  return await connector.signAndSendTransaction(tx);
+}
+
+// ✅ Rate-limited signing
+const limiter = signLimiter;
+async function signTx(tx) {
+  const check = limiter.check("sign");
+  if (!check.allowed) {
+    throw new Error("Rate limited");
+  }
+  return await connector.signAndSendTransaction(tx);
+}
+```
+
+### 3. Log Security Events
+
+```typescript
+// ✅ Always log security-relevant actions
+const auditLog = createAuditLog({ persist: true });
+
+auditLog.log("wallet:connect", { walletId });
+auditLog.logTransaction("tx:sign", { receiverId });
+auditLog.logSecurityWarning("Suspicious activity", { details });
+```
+
+### 4. Use Secure Storage
+
+```typescript
+// ❌ Plain localStorage for sensitive data
+localStorage.setItem("token", sensitiveToken);
+
+// ✅ Encrypted storage
+const storage = await createSecureStorage();
+await storage.set("token", sensitiveToken);
+```
+
+### 5. Configure CSP Headers
+
+```typescript
+// ✅ Set restrictive CSP
+const csp = getRecommendedCSP();
+// Add to server response headers
+response.setHeader("Content-Security-Policy", csp);
+```
+
+For support: [support@shadowcorp.dev](mailto:support@shadowcorp.dev)

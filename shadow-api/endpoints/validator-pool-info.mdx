@@ -1,0 +1,953 @@
+---
+title: Validators
+description: Retrieve detailed information about NEAR validator pools and staking data. Access pool metrics, delegation statistics, fee structures, and validator performance data.
+icon: users
+---
+
+import { Endpoint, Request } from '@mintlify/components';
+
+## Get Validator Pool Information
+
+<Endpoint method="GET" path="/v1/validators/:pool" />
+
+Retrieve comprehensive information for a specific NEAR validator pool, including staking amounts, fee structure, owner details, and delegator statistics.
+
+<Info>
+  This endpoint provides detailed pool-level data. For a list of all active validators, use the `/v1/validators` endpoint.
+</Info>
+
+### Path Parameters
+
+<ParamField path="pool" type="string" required>
+  The validator pool account ID. This is the NEAR account that operates the validator node (e.g., `shadowcorp.pool.near`, `pool.near`, `figment.poolv1.near`).
+  
+  **Examples:**
+  - `shadowcorp.pool.near` - ShadowCorp validator pool
+  - `pool.near` - NEAR Foundation pool
+  - `figment.poolv1.near` - Figment validator
+  - `staked.poolv1.near` - Staked validator pool
+</ParamField>
+
+### Making Requests
+
+<Tabs>
+  <Tab title="cURL">
+    **Get validator pool info:**
+    ```bash
+    curl -H "X-API-Key: YOUR_KEY" \
+      "https://api.shadowcorp.dev/v1/validators/shadowcorp.pool.near"
+    ```
+
+    **Popular validator pools:**
+    ```bash
+    # ShadowCorp pool
+    curl -H "X-API-Key: YOUR_KEY" \
+      "https://api.shadowcorp.dev/v1/validators/shadowcorp.pool.near"
+
+    # NEAR Foundation pool
+    curl -H "X-API-Key: YOUR_KEY" \
+      "https://api.shadowcorp.dev/v1/validators/pool.near"
+
+    # Figment validator
+    curl -H "X-API-Key: YOUR_KEY" \
+      "https://api.shadowcorp.dev/v1/validators/figment.poolv1.near"
+
+    # Staked pool
+    curl -H "X-API-Key: YOUR_KEY" \
+      "https://api.shadowcorp.dev/v1/validators/staked.poolv1.near"
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    // Get validator pool information
+    const getValidatorPool = async (poolId) => {
+      const response = await fetch(
+        `https://api.shadowcorp.dev/v1/validators/${poolId}`,
+        {
+          headers: {
+            'X-API-Key': 'YOUR_KEY'
+          }
+        }
+      );
+      return await response.json();
+    };
+
+    // Get multiple validator pools
+    const getMultiplePools = async (poolIds) => {
+      const promises = poolIds.map(id => 
+        getValidatorPool(id)
+      );
+      return await Promise.all(promises);
+    };
+
+    // Usage
+    const pool = await getValidatorPool('shadowcorp.pool.near');
+    console.log(`Pool: ${pool.pool_id}`);
+    console.log(`Total Staked: ${pool.total_staked}`);
+    console.log(`Fee: ${pool.fee_percentage}%`);
+    console.log(`Owner: ${pool.owner_id}`);
+    console.log(`Delegators: ${pool.num_delegators}`);
+
+    // Get multiple pools at once
+    const pools = await getMultiplePools([
+      'shadowcorp.pool.near',
+      'pool.near',
+      'figment.poolv1.near'
+    ]);
+    ```
+  </Tab>
+  
+  <Tab title="Python">
+    ```python
+    import requests
+
+    class ValidatorPoolAPI:
+        def __init__(self, api_key):
+            self.base_url = 'https://api.shadowcorp.dev'
+            self.headers = {'X-API-Key': api_key}
+        
+        def get_validator_pool(self, pool_id):
+            """Get information for a validator pool"""
+            response = requests.get(
+                f'{self.base_url}/v1/validators/{pool_id}',
+                headers=self.headers
+            )
+            return response.json()
+        
+        def get_multiple_pools(self, pool_ids):
+            """Get information for multiple validator pools"""
+            return [
+                self.get_validator_pool(pool_id)
+                for pool_id in pool_ids
+            ]
+        
+        def get_pool_summary(self, pool_id):
+            """Get formatted summary of validator pool"""
+            data = self.get_validator_pool(pool_id)
+            
+            # Convert yoctoNEAR to NEAR (1 NEAR = 10^24 yoctoNEAR)
+            total_near = float(data.get('total_staked', 0)) / 1e24
+            
+            return {
+                'pool_id': data.get('pool_id'),
+                'total_staked_near': f"{total_near:,.2f}",
+                'fee_percentage': data.get('fee_percentage'),
+                'owner_id': data.get('owner_id'),
+                'num_delegators': data.get('num_delegators')
+            }
+
+    # Usage
+    api = ValidatorPoolAPI('YOUR_KEY')
+    
+    # Single pool
+    pool = api.get_validator_pool('shadowcorp.pool.near')
+    print(f"Pool: {pool['pool_id']}")
+    print(f"Fee: {pool['fee_percentage']}%")
+    
+    # Multiple pools
+    pools = api.get_multiple_pools([
+        'shadowcorp.pool.near',
+        'pool.near',
+        'figment.poolv1.near'
+    ])
+    
+    for pool in pools:
+        print(f"{pool['pool_id']}: {pool['num_delegators']} delegators")
+    
+    # Formatted summary
+    summary = api.get_pool_summary('shadowcorp.pool.near')
+    print(f"Total staked: {summary['total_staked_near']} NEAR")
+    ```
+  </Tab>
+  
+  <Tab title="Go">
+    ```go
+    package main
+
+    import (
+        "encoding/json"
+        "fmt"
+        "net/http"
+    )
+
+    type ValidatorPoolClient struct {
+        BaseURL string
+        APIKey  string
+        Client  *http.Client
+    }
+
+    type ValidatorPool struct {
+        PoolID         string  `json:"pool_id"`
+        TotalStaked    string  `json:"total_staked"`
+        FeePercentage  float64 `json:"fee_percentage"`
+        OwnerID        string  `json:"owner_id"`
+        NumDelegators  int     `json:"num_delegators"`
+    }
+
+    func NewValidatorPoolClient(apiKey string) *ValidatorPoolClient {
+        return &ValidatorPoolClient{
+            BaseURL: "https://api.shadowcorp.dev",
+            APIKey:  apiKey,
+            Client:  &http.Client{},
+        }
+    }
+
+    func (c *ValidatorPoolClient) GetValidatorPool(poolID string) (*ValidatorPool, error) {
+        reqURL := fmt.Sprintf("%s/v1/validators/%s", c.BaseURL, poolID)
+        
+        req, err := http.NewRequest("GET", reqURL, nil)
+        if err != nil {
+            return nil, err
+        }
+        
+        req.Header.Add("X-API-Key", c.APIKey)
+        
+        resp, err := c.Client.Do(req)
+        if err != nil {
+            return nil, err
+        }
+        defer resp.Body.Close()
+
+        var pool ValidatorPool
+        if err := json.NewDecoder(resp.Body).Decode(&pool); err != nil {
+            return nil, err
+        }
+        
+        return &pool, nil
+    }
+
+    func (c *ValidatorPoolClient) GetMultiplePools(poolIDs []string) ([]*ValidatorPool, error) {
+        results := make([]*ValidatorPool, 0, len(poolIDs))
+        
+        for _, id := range poolIDs {
+            pool, err := c.GetValidatorPool(id)
+            if err != nil {
+                return nil, err
+            }
+            results = append(results, pool)
+        }
+        
+        return results, nil
+    }
+
+    func main() {
+        client := NewValidatorPoolClient("YOUR_KEY")
+        
+        // Get single pool
+        pool, err := client.GetValidatorPool("shadowcorp.pool.near")
+        if err != nil {
+            panic(err)
+        }
+        
+        fmt.Printf("Pool: %s\n", pool.PoolID)
+        fmt.Printf("Fee: %.1f%%\n", pool.FeePercentage)
+        fmt.Printf("Delegators: %d\n", pool.NumDelegators)
+        
+        // Get multiple pools
+        pools, err := client.GetMultiplePools([]string{
+            "shadowcorp.pool.near",
+            "pool.near",
+            "figment.poolv1.near",
+        })
+        if err != nil {
+            panic(err)
+        }
+        
+        for _, p := range pools {
+            fmt.Printf("%s: %d delegators at %.1f%% fee\n", 
+                p.PoolID, p.NumDelegators, p.FeePercentage)
+        }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Response Format
+
+<ResponseField name="pool_id" type="string" required>
+  The validator pool account ID.
+</ResponseField>
+
+<ResponseField name="total_staked" type="string" required>
+  Total amount of NEAR tokens staked in the pool, represented in yoctoNEAR (1 NEAR = 10^24 yoctoNEAR). Convert to NEAR by dividing by 1e24.
+</ResponseField>
+
+<ResponseField name="fee_percentage" type="number" required>
+  The validator's fee percentage charged on staking rewards. Represented as a decimal (e.g., 5.0 means 5%).
+</ResponseField>
+
+<ResponseField name="owner_id" type="string" required>
+  The NEAR account that owns and operates this validator pool.
+</ResponseField>
+
+<ResponseField name="num_delegators" type="integer" required>
+  The number of unique accounts currently delegating stake to this pool.
+</ResponseField>
+
+<Note>
+  The `total_staked` value is in yoctoNEAR for precision. To convert to human-readable NEAR, divide by 10^24 (1e24).
+</Note>
+
+### Success Response (200 OK)
+
+**ShadowCorp Validator Pool:**
+```json
+{
+  "pool_id": "shadowcorp.pool.near",
+  "total_staked": "74571890529373657505710417269",
+  "fee_percentage": 5.0,
+  "owner_id": "shadowcorp.near",
+  "num_delegators": 20
+}
+```
+
+**NEAR Foundation Pool:**
+```json
+{
+  "pool_id": "pool.near",
+  "total_staked": "123456789012345678901234567890",
+  "fee_percentage": 10.0,
+  "owner_id": "near",
+  "num_delegators": 150
+}
+```
+
+<Check>
+  A `200 OK` status code indicates the validator pool information was retrieved successfully.
+</Check>
+
+## Understanding Validator Pools
+
+<AccordionGroup>
+  <Accordion title="Staking on NEAR" icon="coins">
+    NEAR uses a Proof-of-Stake consensus mechanism where token holders can stake their NEAR to validator pools:
+    
+    - **Validators** run nodes that secure the network
+    - **Delegators** stake NEAR to validators and earn rewards
+    - **Epochs** last approximately 12 hours; rewards are distributed per epoch
+    - **Unstaking** requires a 52-65 hour waiting period
+    
+    **How it works:**
+    1. Choose a validator pool
+    2. Stake your NEAR tokens
+    3. Earn rewards each epoch (minus validator fee)
+    4. Unstake anytime (with waiting period)
+    
+    <Tip>
+      Lower fees don't always mean better returns. Consider validator uptime, performance, and reputation.
+    </Tip>
+  </Accordion>
+  
+  <Accordion title="Fee Structure" icon="percent">
+    Validators charge fees on staking rewards earned by delegators:
+    
+    ```javascript
+    // Example calculation
+    const epochReward = 100; // NEAR earned in one epoch
+    const validatorFee = 5.0; // 5% fee
+    
+    const validatorTake = epochReward * (validatorFee / 100);
+    const delegatorReceives = epochReward - validatorTake;
+    
+    console.log(`Validator gets: ${validatorTake} NEAR`);
+    console.log(`You receive: ${delegatorReceives} NEAR`);
+    // Output:
+    // Validator gets: 5 NEAR
+    // You receive: 95 NEAR
+    ```
+    
+    **Typical fee ranges:**
+    - Foundation pools: 10%
+    - Professional validators: 3-10%
+    - Community pools: 1-5%
+    
+    <Warning>
+      Beware of 0% fee pools - they may not be sustainable long-term.
+    </Warning>
+  </Accordion>
+  
+  <Accordion title="Total Staked Calculation" icon="calculator">
+    The `total_staked` field is in yoctoNEAR. Here's how to work with it:
+    
+    ```javascript
+    function yoctoToNear(yoctoAmount) {
+      // 1 NEAR = 10^24 yoctoNEAR
+      return parseFloat(yoctoAmount) / 1e24;
+    }
+    
+    function nearToYocto(nearAmount) {
+      // Convert NEAR to yoctoNEAR
+      return (nearAmount * 1e24).toString();
+    }
+    
+    // Example
+    const pool = {
+      total_staked: "74571890529373657505710417269"
+    };
+    
+    const totalNear = yoctoToNear(pool.total_staked);
+    console.log(`Total staked: ${totalNear.toFixed(2)} NEAR`);
+    // Output: Total staked: 74571890.53 NEAR
+    ```
+    
+    **Common calculations:**
+    ```javascript
+    // Average stake per delegator
+    const avgStake = totalNear / pool.num_delegators;
+    
+    // Annual percentage yield (example)
+    const apy = 10.0; // 10% APY
+    const annualRewards = totalNear * (apy / 100);
+    ```
+  </Accordion>
+  
+  <Accordion title="Delegator Metrics" icon="users">
+    Understanding delegator counts and distribution:
+    
+    ```javascript
+    const analyzePool = (pool) => {
+      const totalNear = parseFloat(pool.total_staked) / 1e24;
+      const avgStake = totalNear / pool.num_delegators;
+      
+      return {
+        poolId: pool.pool_id,
+        totalStaked: totalNear.toFixed(2),
+        delegators: pool.num_delegators,
+        avgStakePerDelegator: avgStake.toFixed(2),
+        fee: pool.fee_percentage
+      };
+    };
+    
+    const pool = {
+      pool_id: "shadowcorp.pool.near",
+      total_staked: "74571890529373657505710417269",
+      fee_percentage: 5.0,
+      num_delegators: 20
+    };
+    
+    console.log(analyzePool(pool));
+    // {
+    //   poolId: "shadowcorp.pool.near",
+    //   totalStaked: "74571890.53",
+    //   delegators: 20,
+    //   avgStakePerDelegator: "3728594.53",
+    //   fee: 5.0
+    // }
+    ```
+    
+    <Info>
+      A higher number of delegators typically indicates trust and decentralization, but check the distribution to avoid pools dominated by a few large stakers.
+    </Info>
+  </Accordion>
+</AccordionGroup>
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Staking Dashboards" icon="chart-line" color="#3b82f6">
+    Build validator comparison tools showing fees, total stake, and delegator counts.
+  </Card>
+  
+  <Card title="Portfolio Trackers" icon="wallet" color="#8b5cf6">
+    Monitor staking positions and calculate expected rewards across multiple pools.
+  </Card>
+  
+  <Card title="Validator Rankings" icon="ranking-star" color="#f59e0b">
+    Create leaderboards ranking validators by performance, fees, and decentralization.
+  </Card>
+  
+  <Card title="Risk Assessment" icon="shield-check" color="#10b981">
+    Analyze pool concentration and validator diversification for risk management.
+  </Card>
+</CardGroup>
+
+## Advanced Example: Validator Pool Analyzer
+
+Here's a complete example of a validator pool analysis tool:
+
+```javascript
+class ValidatorPoolAnalyzer {
+  constructor(apiKey) {
+    this.apiKey = apiKey;
+    this.baseUrl = 'https://api.shadowcorp.dev';
+    this.cache = new Map();
+  }
+
+  async getPoolInfo(poolId, useCache = true) {
+    // Check cache first
+    if (useCache && this.cache.has(poolId)) {
+      console.log(`✅ Using cached data for ${poolId}`);
+      return this.cache.get(poolId);
+    }
+
+    console.log(`🔍 Fetching pool info for ${poolId}...`);
+    const response = await fetch(
+      `${this.baseUrl}/v1/validators/${poolId}`,
+      {
+        headers: { 'X-API-Key': this.apiKey }
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch ${poolId}: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    this.cache.set(poolId, data);
+    return data;
+  }
+
+  yoctoToNear(yoctoAmount) {
+    return parseFloat(yoctoAmount) / 1e24;
+  }
+
+  async comparePools(poolIds) {
+    console.log(`📊 Comparing ${poolIds.length} validator pools...\n`);
+    
+    const pools = await Promise.all(
+      poolIds.map(id => this.getPoolInfo(id))
+    );
+
+    // Calculate metrics for each pool
+    const analyzed = pools.map(pool => {
+      const totalNear = this.yoctoToNear(pool.total_staked);
+      const avgStake = totalNear / pool.num_delegators;
+      
+      return {
+        ...pool,
+        total_near: totalNear,
+        avg_stake: avgStake,
+        estimated_yearly_fee: totalNear * (pool.fee_percentage / 100) * 0.10 // Assuming 10% APY
+      };
+    });
+
+    // Sort by total stake
+    const sorted = analyzed.sort((a, b) => b.total_near - a.total_near);
+
+    // Display comparison table
+    console.log('Validator Pool Comparison:');
+    console.log('═'.repeat(100));
+    console.log(
+      'Pool ID'.padEnd(30) + 
+      'Total Staked'.padEnd(20) + 
+      'Fee'.padEnd(10) + 
+      'Delegators'.padEnd(15) +
+      'Avg Stake'
+    );
+    console.log('═'.repeat(100));
+
+    sorted.forEach(pool => {
+      const poolId = pool.pool_id.substring(0, 28);
+      const totalStaked = `${pool.total_near.toLocaleString(undefined, {maximumFractionDigits: 2})} NEAR`;
+      const fee = `${pool.fee_percentage}%`;
+      const delegators = pool.num_delegators.toString();
+      const avgStake = `${pool.avg_stake.toLocaleString(undefined, {maximumFractionDigits: 2})} NEAR`;
+      
+      console.log(
+        poolId.padEnd(30) +
+        totalStaked.padEnd(20) +
+        fee.padEnd(10) +
+        delegators.padEnd(15) +
+        avgStake
+      );
+    });
+
+    console.log('═'.repeat(100));
+
+    return sorted;
+  }
+
+  async getPoolStats(poolId) {
+    const pool = await this.getPoolInfo(poolId);
+    const totalNear = this.yoctoToNear(pool.total_staked);
+    const avgStake = totalNear / pool.num_delegators;
+    
+    const stats = {
+      poolId: pool.pool_id,
+      ownerId: pool.owner_id,
+      totalStaked: totalNear,
+      totalStakedFormatted: `${totalNear.toLocaleString(undefined, {maximumFractionDigits: 2})} NEAR`,
+      feePercentage: pool.fee_percentage,
+      numDelegators: pool.num_delegators,
+      avgStakePerDelegator: avgStake,
+      avgStakeFormatted: `${avgStake.toLocaleString(undefined, {maximumFractionDigits: 2})} NEAR`
+    };
+
+    return stats;
+  }
+
+  calculateRewards(stakeAmount, pool, apy = 10.0) {
+    // Calculate net rewards after validator fee
+    const grossRewards = stakeAmount * (apy / 100);
+    const validatorFee = grossRewards * (pool.fee_percentage / 100);
+    const netRewards = grossRewards - validatorFee;
+    
+    return {
+      stakeAmount,
+      apy,
+      grossRewards,
+      validatorFee: {
+        amount: validatorFee,
+        percentage: pool.fee_percentage
+      },
+      netRewards,
+      effectiveApy: (netRewards / stakeAmount) * 100
+    };
+  }
+
+  async generateReport(poolId) {
+    const stats = await this.getPoolStats(poolId);
+    
+    console.log('\n' + '═'.repeat(80));
+    console.log(`Validator Pool Report: ${stats.poolId}`);
+    console.log('═'.repeat(80));
+    console.log(`\nPool Information:`);
+    console.log(`  Pool ID: ${stats.poolId}`);
+    console.log(`  Owner: ${stats.ownerId}`);
+    console.log(`  Fee: ${stats.feePercentage}%`);
+    console.log(`\nStaking Metrics:`);
+    console.log(`  Total Staked: ${stats.totalStakedFormatted}`);
+    console.log(`  Delegators: ${stats.numDelegators}`);
+    console.log(`  Average Stake: ${stats.avgStakeFormatted}`);
+    
+    // Example reward calculation
+    const exampleStake = 1000;
+    const rewards = this.calculateRewards(exampleStake, { fee_percentage: stats.feePercentage });
+    console.log(`\nReward Example (${exampleStake} NEAR staked):`);
+    console.log(`  Gross Annual Rewards: ${rewards.grossRewards.toFixed(2)} NEAR (${rewards.apy}% APY)`);
+    console.log(`  Validator Fee: ${rewards.validatorFee.amount.toFixed(2)} NEAR (${rewards.validatorFee.percentage}%)`);
+    console.log(`  Net Annual Rewards: ${rewards.netRewards.toFixed(2)} NEAR`);
+    console.log(`  Effective APY: ${rewards.effectiveApy.toFixed(2)}%`);
+    
+    console.log('═'.repeat(80) + '\n');
+
+    return stats;
+  }
+}
+
+// Usage Examples
+const analyzer = new ValidatorPoolAnalyzer('YOUR_KEY');
+
+// Single pool report
+await analyzer.generateReport('shadowcorp.pool.near');
+
+// Compare multiple pools
+await analyzer.comparePools([
+  'shadowcorp.pool.near',
+  'pool.near',
+  'figment.poolv1.near',
+  'staked.poolv1.near'
+]);
+
+// Get detailed stats
+const stats = await analyzer.getPoolStats('shadowcorp.pool.near');
+console.log(`${stats.poolId}: ${stats.totalStakedFormatted} from ${stats.numDelegators} delegators`);
+
+// Calculate potential rewards
+const pool = await analyzer.getPoolInfo('shadowcorp.pool.near');
+const rewards = analyzer.calculateRewards(5000, pool, 10.0);
+console.log(`Staking 5000 NEAR would earn ${rewards.netRewards.toFixed(2)} NEAR annually`);
+```
+
+## Pool Selection Strategy
+
+Evaluate validators using multiple criteria:
+
+```javascript
+async function evaluateValidatorPool(poolId) {
+  const analyzer = new ValidatorPoolAnalyzer('YOUR_KEY');
+  const stats = await analyzer.getPoolStats(poolId);
+  
+  const score = {
+    poolId: stats.poolId,
+    metrics: {}
+  };
+  
+  // Fee score (lower is better, 0-10 scale)
+  score.metrics.feeScore = Math.max(0, 10 - stats.feePercentage);
+  
+  // Decentralization score (more delegators = better)
+  if (stats.numDelegators > 100) {
+    score.metrics.decentralizationScore = 10;
+  } else if (stats.numDelegators > 50) {
+    score.metrics.decentralizationScore = 7;
+  } else if (stats.numDelegators > 20) {
+    score.metrics.decentralizationScore = 5;
+  } else {
+    score.metrics.decentralizationScore = 3;
+  }
+  
+  // Size score (larger pools = more stable, but consider decentralization)
+  const sizeInMillions = stats.totalStaked / 1000000;
+  if (sizeInMillions > 50) {
+    score.metrics.sizeScore = 10;
+  } else if (sizeInMillions > 10) {
+    score.metrics.sizeScore = 7;
+  } else if (sizeInMillions > 1) {
+    score.metrics.sizeScore = 5;
+  } else {
+    score.metrics.sizeScore = 3;
+  }
+  
+  // Calculate overall score
+  score.overallScore = (
+    score.metrics.feeScore * 0.4 +
+    score.metrics.decentralizationScore * 0.3 +
+    score.metrics.sizeScore * 0.3
+  ).toFixed(2);
+  
+  console.log(`\n📊 Evaluation for ${poolId}:`);
+  console.log(`  Fee Score: ${score.metrics.feeScore}/10`);
+  console.log(`  Decentralization Score: ${score.metrics.decentralizationScore}/10`);
+  console.log(`  Size Score: ${score.metrics.sizeScore}/10`);
+  console.log(`  Overall Score: ${score.overallScore}/10`);
+  
+  return score;
+}
+
+// Evaluate a pool
+await evaluateValidatorPool('shadowcorp.pool.near');
+```
+
+## Error Responses
+
+### 400 Bad Request
+
+```json
+{
+  "error": "Invalid pool ID format",
+  "code": 400
+}
+```
+
+<Warning>
+  Ensure the pool ID follows NEAR naming conventions (e.g., `validator.pool.near` or `pool.near`).
+</Warning>
+
+### 401 Unauthorized
+
+```json
+{
+  "error": "Missing or invalid API key",
+  "code": 401
+}
+```
+
+### 404 Not Found
+
+```json
+{
+  "error": "Validator pool not found",
+  "code": 404,
+  "pool_id": "invalid.pool.near"
+}
+```
+
+<Note>
+  A 404 error means the pool either does not exist or is not currently active as a validator.
+</Note>
+
+### 500 Internal Server Error
+
+```json
+{
+  "error": "Failed to fetch validator pool information",
+  "code": 500
+}
+```
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+  <Card 
+    title="All Validators" 
+    icon="list" 
+    href="/shadow-api/endpoints/all-current-validators"
+  >
+    Get a list of all active validator pools
+  </Card>
+  
+  <Card 
+    title="Account Staking" 
+    icon="coins" 
+    href="/shadow-api/endpoints/account-stakings"
+  >
+    View staking positions for specific accounts
+  </Card>
+  
+  <Card 
+    title="Network Stats" 
+    icon="chart-mixed" 
+    href="/shadow-api/endpoints/stats"
+  >
+    Network-wide staking and validator statistics
+  </Card>
+  
+  <Card 
+    title="Account Balance" 
+    icon="wallet" 
+    href="/shadow-api/endpoints/account-balance"
+  >
+    Check account balances and available stake
+  </Card>
+</CardGroup>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Caching Strategy" icon="database">
+    Validator pool data changes slowly. Implement caching to reduce API calls:
+    
+    ```javascript
+    const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+    
+    class PoolDataCache {
+      constructor() {
+        this.cache = new Map();
+      }
+      
+      async get(poolId, fetcher) {
+        const cached = this.cache.get(poolId);
+        
+        if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+          return cached.data;
+        }
+        
+        const data = await fetcher(poolId);
+        this.cache.set(poolId, {
+          data,
+          timestamp: Date.now()
+        });
+        
+        return data;
+      }
+      
+      invalidate(poolId) {
+        this.cache.delete(poolId);
+      }
+      
+      clear() {
+        this.cache.clear();
+      }
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Error Handling" icon="triangle-exclamation">
+    Always handle potential errors gracefully:
+    
+    ```javascript
+    async function safeGetValidatorPool(poolId) {
+      try {
+        const response = await fetch(
+          `https://api.shadowcorp.dev/v1/validators/${poolId}`,
+          { headers: { 'X-API-Key': 'YOUR_KEY' } }
+        );
+        
+        if (!response.ok) {
+          if (response.status === 404) {
+            return { error: 'Validator pool not found' };
+          }
+          throw new Error(`HTTP ${response.status}`);
+        }
+        
+        return await response.json();
+      } catch (error) {
+        console.error(`Failed to fetch ${poolId}:`, error);
+        return { error: error.message };
+      }
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Batch Processing" icon="layer-group">
+    When fetching multiple pools, use Promise.all with rate limiting:
+    
+    ```javascript
+    async function batchGetValidators(poolIds, batchSize = 5) {
+      const results = [];
+      
+      for (let i = 0; i < poolIds.length; i += batchSize) {
+        const batch = poolIds.slice(i, i + batchSize);
+        const batchResults = await Promise.all(
+          batch.map(id => getValidatorPool(id))
+        );
+        results.push(...batchResults);
+        
+        // Small delay between batches
+        if (i + batchSize < poolIds.length) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }
+      
+      return results;
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Precision Handling" icon="calculator">
+    Handle large numbers correctly when working with yoctoNEAR:
+    
+    ```javascript
+    class PrecisionHelper {
+      static YOCTO_PER_NEAR = '1000000000000000000000000'; // 10^24
+      
+      static yoctoToNear(yocto) {
+        // Use string manipulation to avoid precision loss
+        const yoctoStr = yocto.toString();
+        const nearStr = yoctoStr.padStart(25, '0');
+        const integerPart = nearStr.slice(0, -24) || '0';
+        const decimalPart = nearStr.slice(-24);
+        
+        // Trim trailing zeros
+        const trimmedDecimal = decimalPart.replace(/0+$/, '');
+        
+        if (trimmedDecimal) {
+          return `${integerPart}.${trimmedDecimal}`;
+        }
+        return integerPart;
+      }
+      
+      static nearToYocto(near) {
+        const [integer = '0', decimal = ''] = near.toString().split('.');
+        const paddedDecimal = decimal.padEnd(24, '0').slice(0, 24);
+        return integer + paddedDecimal;
+      }
+      
+      static formatNear(yocto, decimals = 2) {
+        const near = parseFloat(yocto) / 1e24;
+        return near.toLocaleString(undefined, {
+          minimumFractionDigits: decimals,
+          maximumFractionDigits: decimals
+        });
+      }
+    }
+    
+    // Usage
+    const pool = { total_staked: "74571890529373657505710417269" };
+    console.log(PrecisionHelper.formatNear(pool.total_staked));
+    // Output: 74,571,890.53
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Tips for Choosing Validators
+
+<CardGroup cols={2}>
+  <Card title="Check Performance History" icon="clock-rotate-left" color="#3b82f6">
+    Look for validators with consistent uptime and no slashing history.
+  </Card>
+  
+  <Card title="Diversify Stakes" icon="diagram-project" color="#8b5cf6">
+    Spread stake across multiple validators to reduce risk.
+  </Card>
+  
+  <Card title="Consider Decentralization" icon="network-wired" color="#f59e0b">
+    Support smaller validators to improve network decentralization.
+  </Card>
+  
+  <Card title="Monitor Fee Changes" icon="percent" color="#10b981">
+    Track fee adjustments and validator announcements regularly.
+  </Card>
+</CardGroup>

@@ -1,0 +1,564 @@
+---
+title: "Quick Start"
+description: "Get up and running with NearConnect wallet connections in just a few minutes. This guide covers the most common use cases and basic wallet integration."
+icon: book
+---
+
+import { Callout } from '@/components/ui/callout'
+
+## Basic Wallet Connection
+
+Connect to any NEAR wallet with minimal configuration:
+
+```typescript
+import { NearConnector } from "@shadowcorp/near-connect";
+
+// Initialize connector
+const connector = new NearConnector({
+  network: "mainnet"
+});
+
+// Listen for connection events
+connector.on("wallet:signIn", async ({ accounts }) => {
+  console.log("Connected:", accounts[0].accountId);
+  
+  // Store connected account
+  const currentAccount = accounts[0];
+  console.log("Account ID:", currentAccount.accountId);
+});
+
+connector.on("wallet:signOut", () => {
+  console.log("Disconnected");
+  // Clear UI state
+});
+
+// Get available wallets
+const wallets = connector.getWallets();
+console.log("Available wallets:", wallets);
+
+// Connect to a specific wallet
+await connector.connect("meteor-wallet");
+```
+
+## Check Connection Status
+
+Verify if a wallet is already connected:
+
+```typescript
+// Check if connected
+if (connector.isConnected()) {
+  const accounts = connector.getAccounts();
+  console.log("Already connected:", accounts[0].accountId);
+} else {
+  console.log("No wallet connected");
+}
+
+// Get current wallet info
+const wallet = connector.getActiveWallet();
+if (wallet) {
+  console.log("Connected to:", wallet.name);
+}
+```
+
+## Sign and Send Transactions
+
+Execute transactions on the NEAR blockchain:
+
+```typescript
+// Simple NEAR transfer
+const result = await connector.signAndSendTransaction({
+  receiverId: "recipient.near",
+  actions: [
+    {
+      type: "Transfer",
+      params: {
+        deposit: "1000000000000000000000000" // 1 NEAR in yoctoNEAR
+      }
+    }
+  ]
+});
+
+console.log("Transaction hash:", result.transaction.hash);
+console.log("Status:", result.status);
+```
+
+## Function Call Example
+
+Call a smart contract method:
+
+```typescript
+// Call a contract function
+const result = await connector.signAndSendTransaction({
+  receiverId: "contract.near",
+  actions: [
+    {
+      type: "FunctionCall",
+      params: {
+        methodName: "set_greeting",
+        args: { greeting: "Hello, NEAR!" },
+        gas: "30000000000000", // 30 TGas
+        deposit: "0"
+      }
+    }
+  ]
+});
+
+console.log("Function call result:", result);
+```
+
+## Using the Wallet Selector Modal
+
+NearConnect includes pre-built UI components for easy wallet selection:
+
+```typescript
+import {
+  WalletSelectorModal,
+  darkTheme
+} from "@shadowcorp/near-connect";
+
+// Create modal
+const selectorModal = new WalletSelectorModal({
+  wallets: connector.getWallets(),
+  theme: darkTheme,
+  onSelect: async (walletId) => {
+    try {
+      await connector.connect(walletId);
+      selectorModal.close();
+    } catch (error) {
+      console.error("Connection failed:", error);
+    }
+  }
+});
+
+// Show modal when user clicks "Connect Wallet"
+document.getElementById("connect-btn").addEventListener("click", () => {
+  selectorModal.open();
+});
+```
+
+## Transaction Confirmation Modal
+
+Display a confirmation UI before signing:
+
+```typescript
+import { TransactionModal } from "@shadowcorp/near-connect";
+
+const transaction = {
+  receiverId: "example.near",
+  actions: [
+    {
+      type: "Transfer",
+      params: { deposit: "1000000000000000000000000" }
+    }
+  ]
+};
+
+const txModal = new TransactionModal({
+  transaction,
+  theme: darkTheme,
+  onConfirm: async () => {
+    try {
+      const result = await connector.signAndSendTransaction(transaction);
+      console.log("Success:", result);
+      txModal.close();
+    } catch (error) {
+      console.error("Transaction failed:", error);
+    }
+  },
+  onCancel: () => {
+    console.log("Transaction cancelled");
+    txModal.close();
+  }
+});
+
+txModal.open();
+```
+
+## Session Persistence
+
+Save and restore wallet sessions across page reloads:
+
+```typescript
+import {
+  SessionManager,
+  LocalStorage
+} from "@shadowcorp/near-connect";
+
+// Create session manager
+const session = new SessionManager({
+  storage: new LocalStorage(),
+  key: "near-wallet-session",
+  expiresIn: 7 * 24 * 60 * 60 * 1000 // 7 days
+});
+
+// Save session after connection
+connector.on("wallet:signIn", async ({ accounts, walletId }) => {
+  await session.save({
+    walletId,
+    accountId: accounts[0].accountId,
+    connectedAt: Date.now()
+  });
+});
+
+// Restore session on page load
+async function restoreSession() {
+  const savedSession = await session.load();
+  
+  if (savedSession && savedSession.walletId) {
+    try {
+      await connector.connect(savedSession.walletId);
+      console.log("Session restored:", savedSession.accountId);
+    } catch (error) {
+      console.error("Failed to restore session:", error);
+      await session.clear();
+    }
+  }
+}
+
+// Call on app startup
+restoreSession();
+```
+
+## Hardware Wallet (Ledger)
+
+Connect to a Ledger hardware wallet:
+
+```typescript
+import { createLedgerWallet } from "@shadowcorp/near-connect";
+
+const ledger = createLedgerWallet({
+  network: "mainnet",
+  rpcUrl: "https://rpc.mainnet.near.org"
+});
+
+// Listen for hardware prompts
+ledger.on("waiting", ({ action }) => {
+  // Show UI: "Please confirm on your Ledger device..."
+  console.log(`Waiting: ${action}`);
+});
+
+ledger.on("confirm", ({ action }) => {
+  // Show UI: "Confirmed!"
+  console.log(`Confirmed: ${action}`);
+});
+
+ledger.on("error", ({ error }) => {
+  console.error("Ledger error:", error);
+});
+
+// Connect to device
+await ledger.connect();
+
+// Get accounts from Ledger
+const accounts = ledger.getAccounts();
+console.log("Ledger accounts:", accounts);
+
+// Sign transaction
+const result = await ledger.signAndSendTransaction({
+  receiverId: "example.near",
+  actions: [
+    {
+      type: "Transfer",
+      params: { deposit: "1000000000000000000000000" }
+    }
+  ]
+});
+```
+
+<Callout type="info">
+Hardware wallet support requires a Chromium-based browser (Chrome, Edge, Opera) and an HTTPS connection.
+</Callout>
+
+## Mobile Wallet Support
+
+Connect to mobile wallets via deep links or WalletConnect:
+
+```typescript
+import { ExternalWalletManager } from "@shadowcorp/near-connect";
+
+const external = new ExternalWalletManager({
+  network: "mainnet",
+  appName: "My dApp",
+  appUrl: "https://mydapp.com",
+  callbackUrl: "https://mydapp.com/callback"
+});
+
+// Connect via deep link (Meteor, HERE wallet)
+await external.connect("meteor-mobile");
+
+// Or via WalletConnect
+await external.connect("walletconnect");
+
+// Handle callback after mobile wallet redirect
+window.addEventListener("load", async () => {
+  const params = new URLSearchParams(window.location.search);
+  
+  if (params.has("account_id")) {
+    const accountId = params.get("account_id");
+    console.log("Returned from mobile wallet:", accountId);
+    // Continue with connected state
+  }
+});
+```
+
+## Error Handling
+
+Handle common wallet connection errors:
+
+```typescript
+async function connectWallet(walletId: string) {
+  try {
+    await connector.connect(walletId);
+  } catch (error) {
+    if (error.code === "USER_REJECTED") {
+      console.log("User cancelled connection");
+    } else if (error.code === "WALLET_NOT_FOUND") {
+      console.log("Wallet not installed");
+      // Show installation instructions
+    } else if (error.code === "NETWORK_ERROR") {
+      console.log("Network connection failed");
+      // Retry or show error
+    } else {
+      console.error("Unexpected error:", error);
+    }
+  }
+}
+```
+
+## Disconnect Wallet
+
+Properly disconnect from a wallet:
+
+```typescript
+// Disconnect current wallet
+await connector.disconnect();
+
+// Clear session
+await session.clear();
+
+// Update UI
+console.log("Wallet disconnected");
+```
+
+## Multi-Account Support
+
+Handle multiple connected accounts:
+
+```typescript
+import { AccountSwitcherModal } from "@shadowcorp/near-connect";
+
+// Get all connected accounts
+const accounts = connector.getAccounts();
+console.log(`${accounts.length} accounts connected`);
+
+// Switch between accounts
+const switcherModal = new AccountSwitcherModal({
+  accounts: accounts,
+  currentAccount: accounts[0],
+  onSwitch: async (account) => {
+    await connector.switchAccount(account.accountId);
+    console.log("Switched to:", account.accountId);
+    switcherModal.close();
+  }
+});
+
+// Show account switcher
+document.getElementById("account-btn").addEventListener("click", () => {
+  switcherModal.open();
+});
+```
+
+## React Integration Example
+
+Basic React hook for wallet connection:
+
+```typescript
+import { useState, useEffect } from 'react';
+import { NearConnector } from '@shadowcorp/near-connect';
+
+function useNearWallet() {
+  const [connector] = useState(() => new NearConnector({ network: 'mainnet' }));
+  const [account, setAccount] = useState(null);
+  const [isConnected, setIsConnected] = useState(false);
+
+  useEffect(() => {
+    connector.on('wallet:signIn', ({ accounts }) => {
+      setAccount(accounts[0]);
+      setIsConnected(true);
+    });
+
+    connector.on('wallet:signOut', () => {
+      setAccount(null);
+      setIsConnected(false);
+    });
+
+    // Check for existing connection
+    if (connector.isConnected()) {
+      const accounts = connector.getAccounts();
+      setAccount(accounts[0]);
+      setIsConnected(true);
+    }
+  }, [connector]);
+
+  const connect = async (walletId: string) => {
+    await connector.connect(walletId);
+  };
+
+  const disconnect = async () => {
+    await connector.disconnect();
+  };
+
+  const signAndSendTransaction = async (transaction) => {
+    return await connector.signAndSendTransaction(transaction);
+  };
+
+  return {
+    connector,
+    account,
+    isConnected,
+    connect,
+    disconnect,
+    signAndSendTransaction
+  };
+}
+
+// Usage in component
+function App() {
+  const { account, isConnected, connect, disconnect } = useNearWallet();
+
+  return (
+    <div>
+      {isConnected ? (
+        <>
+          <p>Connected: {account.accountId}</p>
+          <button onClick={disconnect}>Disconnect</button>
+        </>
+      ) : (
+        <button onClick={() => connect('meteor-wallet')}>Connect Wallet</button>
+      )}
+    </div>
+  );
+}
+```
+
+## Complete Example
+
+Here's a complete example putting it all together:
+
+```typescript
+import {
+  NearConnector,
+  WalletSelectorModal,
+  SessionManager,
+  LocalStorage,
+  darkTheme
+} from "@shadowcorp/near-connect";
+
+class WalletApp {
+  private connector: NearConnector;
+  private session: SessionManager;
+  private modal: WalletSelectorModal;
+
+  constructor() {
+    // Initialize connector
+    this.connector = new NearConnector({
+      network: "mainnet",
+      hardware: { ledger: { enabled: true } }
+    });
+
+    // Setup session persistence
+    this.session = new SessionManager({
+      storage: new LocalStorage(),
+      key: "my-app-session"
+    });
+
+    // Create wallet selector modal
+    this.modal = new WalletSelectorModal({
+      wallets: this.connector.getWallets(),
+      theme: darkTheme,
+      onSelect: (walletId) => this.connect(walletId)
+    });
+
+    // Listen for events
+    this.setupEventListeners();
+  }
+
+  private setupEventListeners() {
+    this.connector.on("wallet:signIn", async ({ accounts, walletId }) => {
+      console.log("Connected:", accounts[0].accountId);
+      await this.session.save({ walletId, accountId: accounts[0].accountId });
+      this.updateUI();
+    });
+
+    this.connector.on("wallet:signOut", async () => {
+      console.log("Disconnected");
+      await this.session.clear();
+      this.updateUI();
+    });
+  }
+
+  async connect(walletId: string) {
+    try {
+      await this.connector.connect(walletId);
+      this.modal.close();
+    } catch (error) {
+      console.error("Connection failed:", error);
+      alert("Failed to connect: " + error.message);
+    }
+  }
+
+  async disconnect() {
+    await this.connector.disconnect();
+  }
+
+  async sendTransaction(receiverId: string, amount: string) {
+    try {
+      const result = await this.connector.signAndSendTransaction({
+        receiverId,
+        actions: [{ type: "Transfer", params: { deposit: amount } }]
+      });
+      console.log("Transaction successful:", result);
+      return result;
+    } catch (error) {
+      console.error("Transaction failed:", error);
+      throw error;
+    }
+  }
+
+  async restoreSession() {
+    const saved = await this.session.load();
+    if (saved && saved.walletId) {
+      try {
+        await this.connector.connect(saved.walletId);
+      } catch (error) {
+        await this.session.clear();
+      }
+    }
+  }
+
+  private updateUI() {
+    const isConnected = this.connector.isConnected();
+    const accounts = isConnected ? this.connector.getAccounts() : [];
+    
+    // Update your UI here
+    console.log("UI State:", { isConnected, accounts });
+  }
+
+  showConnectModal() {
+    this.modal.open();
+  }
+}
+
+// Initialize app
+const app = new WalletApp();
+
+// Restore session on load
+app.restoreSession();
+
+// Connect button
+document.getElementById("connect-btn")?.addEventListener("click", () => {
+  app.showConnectModal();
+});
+```
+
+For support: [support@shadowcorp.dev](mailto:support@shadowcorp.dev)

@@ -16,27 +16,32 @@
     "links": [
       {
         "label": "Support",
-        "href": "mailto:hi@mintlify.com"
+        "href": "https://support.shadowcorp.dev"
       }
     ],
     "primary": {
       "type": "button",
       "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
+      "href": "https://dashboard.shadowcorp.dev"
     }
   },
   "navigation": {
     "global": {
       "anchors": [
         {
+          "anchor": "Github",
+          "icon": "github",
+          "href": "https://github.com/ShadowCorp-Dev"
+        },
+        {
           "anchor": "Discord",
           "icon": "discord",
-          "href": "https://mintlify.com/docs"
+          "href": "https://discord.gg/rRertY2eAU"
         },
         {
           "anchor": "X",
           "icon": "x",
-          "href": "https://mintlify.com/blog"
+          "href": "https://x.com/shadowcorp_dev"
         }
       ]
     },
@@ -45,71 +50,51 @@
         "tab": "NEAR SDKs",
         "groups": [
           {
-            "group": "Getting started",
-            "icon": "flag",
-            "pages": ["index", "quickstart", "development"]
-          },
-          {
             "group": "Shadowcorp SDK",
-            "icon": "book",
             "pages": [
-              "Installation",
+              "shadowcorp-sdk/installation",
               {
                 "group": "Basics",
-                "pages": ["api-reference/health", "api-reference/stats"]
+                "pages": ["shadowcorp-sdk/references/health", "shadowcorp-sdk/references/stats"]
               },
               {
                 "group": "Blocks & Transactions",
-                "pages": ["api-reference/blocks", "api-reference/transactions"]
+                "pages": ["shadowcorp-sdk/references/blocks", "shadowcorp-sdk/references/transactions"]
               },
               {
                 "group": "Transfers",
                 "pages": [
-                  "api-reference/ft-transfers",
-                  "api-reference/nft-transfers"
+                  "shadowcorp-sdk/references/transfers"
                 ]
               },
               {
                 "group": "Assets",
-                "pages": ["api-reference/tokens", "api-reference/nfts"]
+                "pages": ["shadowcorp-sdk/references/tokens", "shadowcorp-sdk/references/nfts"]
               },
               {
                 "group": "Accounts",
-                "pages": ["api-reference/accounts"]
+                "pages": ["shadowcorp-sdk/references/full-account-data", "shadowcorp-sdk/references/account-balance", "shadowcorp-sdk/references/account-stakings", "shadowcorp-sdk/references/burrow-DeFi-positions"]
               },
               {
                 "group": "Validators",
-                "pages": ["api-reference/validators"]
+                "pages": ["shadowcorp-sdk/references/validators"]
               },
               {
                 "group": "Alerts",
-                "pages": ["api-reference/alerts"]
+                "pages": ["shadowcorp-sdk/references/anomaly-alerts"]
               },
               {
                 "group": "Advanced",
-                "pages": ["api-reference/rpc", "api-reference/graph"]
+                "pages": ["shadowcorp-sdk/references/json-rpc", "shadowcorp-sdk/references/graph"]
               }
             ]
           },
           {
             "group": "NEAR Connect SDK",
-            "icon": "plug",
             "pages": [
-              "near-connect/introduction",
-              "near-connect/wallet-integration",
-              "near-connect/security-features",
-              "near-connect/ui-components",
-              "near-connect/advanced-features",
-              {
-                "group": "Examples",
-                "icon": "code",
-                "pages": [
-                  "near-connect/examples/basic-wallet",
-                  "near-connect/examples/ledger-hardware",
-                  "near-connect/examples/secure-transactions",
-                  "near-connect/examples/mobile-walletconnect"
-                ]
-              }
+              "near-connect/installation",
+              "near-connect/quick-start",
+              "near-connect/security-features"
             ]
           }
         ]
@@ -118,8 +103,8 @@
         "tab": "SUI SDKs",
         "groups": [
           {
-            "group": "Introduction",
-            "pages": ["api-reference/introduction"]
+            "group": "SuiEssentials",
+            "pages": ["sui/introduction"]
           }
         ]
       },
@@ -127,8 +112,45 @@
         "tab": "Shadow API",
         "groups": [
           {
-            "group": "Introduction",
-            "pages": ["api-reference/introduction"]
+            "group": "Getting started",
+            "pages": ["shadow-api/introduction"]
+          },
+          {
+            "group": "API Endpoints",
+            "pages": [
+              {
+                "group": "Basics",
+                "pages": ["shadow-api/endpoints/health", "shadow-api/endpoints/stats"]
+              },
+              {
+                "group": "Blocks & Transactions",
+                "pages": ["shadow-api/endpoints/blocks", "shadow-api/endpoints/transactions"]
+              },
+              {
+                "group": "Transfers",
+                "pages": ["shadow-api/endpoints/ft-transfers", "shadow-api/endpoints/nft-transfers"]
+              },
+              {
+                "group": "Assets",
+                "pages": ["shadow-api/endpoints/tokens", "shadow-api/endpoints/nfts"]
+              },
+              {
+                "group": "Accounts",
+                "pages": ["shadow-api/endpoints/full-account-data", "shadow-api/endpoints/account-balance", "shadow-api/endpoints/account-stakings", "shadow-api/endpoints/burrow-DeFi-positions"]
+              },
+              {
+                "group": "Validators",
+                "pages": ["shadow-api/endpoints/all-current-validators", "shadow-api/endpoints/validator-pool-info"]
+              },
+              {
+                "group": "Alerts",
+                "pages": ["shadow-api/endpoints/anomaly-alerts"]
+              },
+              {
+                "group": "Querries",
+                "pages": ["shadow-api/endpoints/json-rpc", "shadow-api/endpoints/graph"]
+              }
+            ]
           }
         ]
       }
@@ -148,9 +170,9 @@
   },
   "footer": {
     "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
+      "github": "https://github.com/ShadowCorp-Dev",
+      "discord": "https://discord.com/invite/rRertY2eAU",
+      "x": "https://x.com/shadowcorp_dev"
     }
   }
 }

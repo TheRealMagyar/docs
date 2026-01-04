@@ -1,0 +1,1384 @@
+---
+title: Account Stakings
+description: Query staking positions in validator pools. Get staked and unstaked balances, withdrawal status, and validator pool information for any NEAR account.
+icon: chart-pie
+---
+
+import { Endpoint, Request } from '@mintlify/components';
+
+## Get Staking Position
+
+<Endpoint method="GET" path="/v1/accounts/:id/staking" />
+
+Retrieve detailed staking information for an account in a specific validator pool. Returns staked balance, unstaked balance awaiting withdrawal, and withdrawal availability status.
+
+<Info>
+  This endpoint queries a specific validator pool. To get all staking positions across all pools, use the [full account data endpoint](//shadow-api/endpoints//full-account-data).
+</Info>
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  The NEAR account ID to query staking information for.
+  
+  **Examples:**
+  - `alice.near` - User account
+  - `therealmagyar.near` - Example staker
+  - `whale.near` - High-value staker
+</ParamField>
+
+### Query Parameters
+
+<ParamField query="pool" type="string" required>
+  The validator pool account ID to query. This must be a valid NEAR validator pool.
+  
+  **Examples:**
+  - `shadowcorp.pool.near` - ShadowCorp validator pool
+  - `pool.near` - NEAR Foundation pool
+  - `zavodil.poolv1.near` - Community validator
+  - `staked.poolv1.near` - Staked pool
+  - `aurora.pool.near` - Aurora validator
+</ParamField>
+
+### Making Requests
+
+<Tabs>
+  <Tab title="cURL">
+    **Get staking position in specific pool:**
+    ```bash
+    curl -H "X-API-Key: YOUR_KEY" \
+      "https://api.shadowcorp.dev/v1/accounts/therealmagyar.near/staking?pool=shadowcorp.pool.near"
+    ```
+
+    **Check multiple pools for same account:**
+    ```bash
+    # Query staking across different pools
+    for pool in shadowcorp.pool.near pool.near zavodil.poolv1.near; do
+      echo "Checking $pool:"
+      curl -H "X-API-Key: YOUR_KEY" \
+        "https://api.shadowcorp.dev/v1/accounts/alice.near/staking?pool=$pool"
+      echo ""
+    done
+    ```
+
+    **Monitor withdrawal availability:**
+    ```bash
+    # Check if unstaked funds can be withdrawn
+    curl -H "X-API-Key: YOUR_KEY" \
+      "https://api.shadowcorp.dev/v1/accounts/alice.near/staking?pool=pool.near" \
+      | jq '.can_withdraw'
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    // Helper function to convert yoctoNEAR to NEAR
+    const yoctoToNear = (yoctoAmount) => {
+      const amount = BigInt(yoctoAmount);
+      const nearAmount = Number(amount) / 1e24;
+      return nearAmount.toFixed(6);
+    };
+
+    // Get staking position in specific pool
+    const getStaking = async (accountId, poolId) => {
+      const response = await fetch(
+        `https://api.shadowcorp.dev/v1/accounts/${accountId}/staking?pool=${poolId}`,
+        {
+          headers: {
+            'X-API-Key': 'YOUR_KEY'
+          }
+        }
+      );
+      return await response.json();
+    };
+
+    // Display formatted staking info
+    const displayStaking = async (accountId, poolId) => {
+      const staking = await getStaking(accountId, poolId);
+      
+      const staked = yoctoToNear(staking.staked_balance);
+      const unstaked = yoctoToNear(staking.unstaked_balance);
+      const total = (parseFloat(staked) + parseFloat(unstaked)).toFixed(6);
+      
+      console.log(`Account: ${staking.account_id}`);
+      console.log(`Pool: ${staking.pool_id}`);
+      console.log(`Staked: ${staked} NEAR`);
+      console.log(`Unstaked: ${unstaked} NEAR`);
+      console.log(`Total: ${total} NEAR`);
+      console.log(`Can Withdraw: ${staking.can_withdraw ? '✅ Yes' : '❌ No (waiting for unlock)'}`);
+      
+      return staking;
+    };
+
+    // Check all common pools for an account
+    const checkAllPools = async (accountId) => {
+      const pools = [
+        'shadowcorp.pool.near',
+        'pool.near',
+        'zavodil.poolv1.near',
+        'staked.poolv1.near',
+        'aurora.pool.near'
+      ];
+      
+      const results = [];
+      
+      for (const pool of pools) {
+        try {
+          const staking = await getStaking(accountId, pool);
+          const staked = parseFloat(yoctoToNear(staking.staked_balance));
+          const unstaked = parseFloat(yoctoToNear(staking.unstaked_balance));
+          
+          // Only include pools with balance
+          if (staked > 0 || unstaked > 0) {
+            results.push({
+              pool: pool,
+              staked: staked,
+              unstaked: unstaked,
+              total: staked + unstaked,
+              canWithdraw: staking.can_withdraw
+            });
+          }
+        } catch (error) {
+          // Pool might not exist or account has no stake
+          continue;
+        }
+      }
+      
+      return results;
+    };
+
+    // Calculate total staking across all pools
+    const getTotalStaking = async (accountId) => {
+      const positions = await checkAllPools(accountId);
+      
+      const total = positions.reduce((sum, pos) => sum + pos.total, 0);
+      const totalStaked = positions.reduce((sum, pos) => sum + pos.staked, 0);
+      const totalUnstaked = positions.reduce((sum, pos) => sum + pos.unstaked, 0);
+      
+      return {
+        positions: positions.length,
+        totalStaked: totalStaked.toFixed(6),
+        totalUnstaked: totalUnstaked.toFixed(6),
+        total: total.toFixed(6),
+        details: positions
+      };
+    };
+
+    // Monitor unstaking progress
+    const monitorUnstaking = async (accountId, poolId, intervalMs = 30000) => {
+      console.log(`⏳ Monitoring unstaking for ${accountId} in ${poolId}...`);
+      
+      const check = async () => {
+        const staking = await getStaking(accountId, poolId);
+        const unstaked = yoctoToNear(staking.unstaked_balance);
+        
+        console.log(`[${new Date().toLocaleTimeString()}] Unstaked: ${unstaked} NEAR - Can withdraw: ${staking.can_withdraw ? '✅' : '⏳'}`);
+        
+        if (staking.can_withdraw) {
+          console.log('✅ Funds ready for withdrawal!');
+          return true;
+        }
+        return false;
+      };
+      
+      // Initial check
+      if (await check()) return;
+      
+      // Check periodically
+      const intervalId = setInterval(async () => {
+        if (await check()) {
+          clearInterval(intervalId);
+        }
+      }, intervalMs);
+    };
+
+    // Usage
+    await displayStaking('therealmagyar.near', 'shadowcorp.pool.near');
+    
+    const allStaking = await getTotalStaking('alice.near');
+    console.log(`\nTotal staking: ${allStaking.total} NEAR across ${allStaking.positions} pools`);
+    
+    // Monitor unstaking (uncomment to use)
+    // await monitorUnstaking('alice.near', 'pool.near', 30000);
+    ```
+  </Tab>
+  
+  <Tab title="Python">
+    ```python
+    import requests
+    from typing import Dict, List, Optional
+    from decimal import Decimal
+    import time
+    from datetime import datetime
+
+    class StakingAPI:
+        def __init__(self, api_key: str):
+            self.base_url = 'https://api.shadowcorp.dev'
+            self.headers = {'X-API-Key': api_key}
+        
+        @staticmethod
+        def yocto_to_near(yocto_amount: str) -> str:
+            """Convert yoctoNEAR to NEAR"""
+            amount = Decimal(yocto_amount) / Decimal(10**24)
+            return f"{amount:.6f}"
+        
+        def get_staking(self, account_id: str, pool_id: str) -> Dict:
+            """Get staking position in specific pool"""
+            response = requests.get(
+                f'{self.base_url}/v1/accounts/{account_id}/staking',
+                params={'pool': pool_id},
+                headers=self.headers
+            )
+            response.raise_for_status()
+            return response.json()
+        
+        def display_staking(self, account_id: str, pool_id: str) -> Dict:
+            """Display formatted staking information"""
+            staking = self.get_staking(account_id, pool_id)
+            
+            staked = self.yocto_to_near(staking['staked_balance'])
+            unstaked = self.yocto_to_near(staking['unstaked_balance'])
+            total = f"{(Decimal(staked) + Decimal(unstaked)):.6f}"
+            
+            print(f"Account: {staking['account_id']}")
+            print(f"Pool: {staking['pool_id']}")
+            print(f"Staked: {staked} NEAR")
+            print(f"Unstaked: {unstaked} NEAR")
+            print(f"Total: {total} NEAR")
+            print(f"Can Withdraw: {'✅ Yes' if staking['can_withdraw'] else '❌ No (waiting for unlock)'}")
+            
+            return staking
+        
+        def check_all_pools(self, account_id: str) -> List[Dict]:
+            """Check staking positions across common validator pools"""
+            pools = [
+                'shadowcorp.pool.near',
+                'pool.near',
+                'zavodil.poolv1.near',
+                'staked.poolv1.near',
+                'aurora.pool.near'
+            ]
+            
+            results = []
+            
+            for pool in pools:
+                try:
+                    staking = self.get_staking(account_id, pool)
+                    staked = Decimal(self.yocto_to_near(staking['staked_balance']))
+                    unstaked = Decimal(self.yocto_to_near(staking['unstaked_balance']))
+                    
+                    # Only include pools with balance
+                    if staked > 0 or unstaked > 0:
+                        results.append({
+                            'pool': pool,
+                            'staked': float(staked),
+                            'unstaked': float(unstaked),
+                            'total': float(staked + unstaked),
+                            'can_withdraw': staking['can_withdraw']
+                        })
+                except Exception:
+                    # Pool might not exist or account has no stake
+                    continue
+            
+            return results
+        
+        def get_total_staking(self, account_id: str) -> Dict:
+            """Calculate total staking across all pools"""
+            positions = self.check_all_pools(account_id)
+            
+            total = sum(pos['total'] for pos in positions)
+            total_staked = sum(pos['staked'] for pos in positions)
+            total_unstaked = sum(pos['unstaked'] for pos in positions)
+            
+            return {
+                'positions': len(positions),
+                'total_staked': f"{total_staked:.6f}",
+                'total_unstaked': f"{total_unstaked:.6f}",
+                'total': f"{total:.6f}",
+                'details': positions
+            }
+        
+        def can_withdraw(self, account_id: str, pool_id: str) -> bool:
+            """Check if unstaked funds can be withdrawn"""
+            staking = self.get_staking(account_id, pool_id)
+            return staking['can_withdraw']
+        
+        def get_withdrawable_amount(self, account_id: str, pool_id: str) -> Optional[str]:
+            """Get amount available for withdrawal"""
+            staking = self.get_staking(account_id, pool_id)
+            
+            if not staking['can_withdraw']:
+                return None
+            
+            return self.yocto_to_near(staking['unstaked_balance'])
+        
+        def monitor_unstaking(self, account_id: str, pool_id: str, 
+                            interval_seconds: int = 30):
+            """Monitor unstaking progress"""
+            print(f"⏳ Monitoring unstaking for {account_id} in {pool_id}...")
+            print("Press Ctrl+C to stop\n")
+            
+            try:
+                while True:
+                    staking = self.get_staking(account_id, pool_id)
+                    unstaked = self.yocto_to_near(staking['unstaked_balance'])
+                    timestamp = datetime.now().strftime('%H:%M:%S')
+                    
+                    status = '✅' if staking['can_withdraw'] else '⏳'
+                    print(f"[{timestamp}] Unstaked: {unstaked} NEAR - Can withdraw: {status}")
+                    
+                    if staking['can_withdraw']:
+                        print('✅ Funds ready for withdrawal!')
+                        break
+                    
+                    time.sleep(interval_seconds)
+            except KeyboardInterrupt:
+                print("\nMonitoring stopped.")
+
+    # Usage
+    api = StakingAPI('YOUR_KEY')
+    
+    # Display staking position
+    api.display_staking('therealmagyar.near', 'shadowcorp.pool.near')
+    
+    # Check all pools
+    all_staking = api.get_total_staking('alice.near')
+    print(f"\nTotal staking: {all_staking['total']} NEAR across {all_staking['positions']} pools")
+    
+    for position in all_staking['details']:
+        print(f"  {position['pool']}: {position['total']:.6f} NEAR")
+    
+    # Check withdrawal status
+    if api.can_withdraw('alice.near', 'pool.near'):
+        amount = api.get_withdrawable_amount('alice.near', 'pool.near')
+        print(f"✅ Can withdraw {amount} NEAR")
+    else:
+        print("⏳ Unstaking still in progress")
+    
+    # Monitor unstaking (uncomment to use)
+    # api.monitor_unstaking('alice.near', 'pool.near', 30)
+    ```
+  </Tab>
+  
+  <Tab title="Go">
+    ```go
+    package main
+
+    import (
+        "encoding/json"
+        "fmt"
+        "math/big"
+        "net/http"
+        "net/url"
+        "time"
+    )
+
+    type StakingClient struct {
+        BaseURL string
+        APIKey  string
+        Client  *http.Client
+    }
+
+    type StakingPosition struct {
+        AccountID       string `json:"account_id"`
+        PoolID          string `json:"pool_id"`
+        StakedBalance   string `json:"staked_balance"`
+        UnstakedBalance string `json:"unstaked_balance"`
+        CanWithdraw     bool   `json:"can_withdraw"`
+    }
+
+    func NewStakingClient(apiKey string) *StakingClient {
+        return &StakingClient{
+            BaseURL: "https://api.shadowcorp.dev",
+            APIKey:  apiKey,
+            Client:  &http.Client{},
+        }
+    }
+
+    func (c *StakingClient) GetStaking(accountID, poolID string) (*StakingPosition, error) {
+        reqURL := fmt.Sprintf("%s/v1/accounts/%s/staking?pool=%s", 
+            c.BaseURL, accountID, url.QueryEscape(poolID))
+        
+        req, err := http.NewRequest("GET", reqURL, nil)
+        if err != nil {
+            return nil, err
+        }
+        
+        req.Header.Add("X-API-Key", c.APIKey)
+        
+        resp, err := c.Client.Do(req)
+        if err != nil {
+            return nil, err
+        }
+        defer resp.Body.Close()
+
+        var staking StakingPosition
+        if err := json.NewDecoder(resp.Body).Decode(&staking); err != nil {
+            return nil, err
+        }
+        
+        return &staking, nil
+    }
+
+    func YoctoToNear(yocto string) (string, error) {
+        amount := new(big.Int)
+        amount, ok := amount.SetString(yocto, 10)
+        if !ok {
+            return "", fmt.Errorf("invalid yocto amount")
+        }
+        
+        divisor := new(big.Int).Exp(big.NewInt(10), big.NewInt(24), nil)
+        quotient := new(big.Float).Quo(
+            new(big.Float).SetInt(amount),
+            new(big.Float).SetInt(divisor),
+        )
+        
+        return quotient.Text('f', 6), nil
+    }
+
+    func (c *StakingClient) DisplayStaking(accountID, poolID string) error {
+        staking, err := c.GetStaking(accountID, poolID)
+        if err != nil {
+            return err
+        }
+        
+        staked, err := YoctoToNear(staking.StakedBalance)
+        if err != nil {
+            return err
+        }
+        
+        unstaked, err := YoctoToNear(staking.UnstakedBalance)
+        if err != nil {
+            return err
+        }
+        
+        withdrawStatus := "❌ No (waiting for unlock)"
+        if staking.CanWithdraw {
+            withdrawStatus = "✅ Yes"
+        }
+        
+        fmt.Printf("Account: %s\n", staking.AccountID)
+        fmt.Printf("Pool: %s\n", staking.PoolID)
+        fmt.Printf("Staked: %s NEAR\n", staked)
+        fmt.Printf("Unstaked: %s NEAR\n", unstaked)
+        fmt.Printf("Can Withdraw: %s\n", withdrawStatus)
+        
+        return nil
+    }
+
+    func (c *StakingClient) CanWithdraw(accountID, poolID string) (bool, error) {
+        staking, err := c.GetStaking(accountID, poolID)
+        if err != nil {
+            return false, err
+        }
+        
+        return staking.CanWithdraw, nil
+    }
+
+    func (c *StakingClient) MonitorUnstaking(accountID, poolID string, intervalSeconds int) error {
+        fmt.Printf("⏳ Monitoring unstaking for %s in %s...\n", accountID, poolID)
+        fmt.Println("Press Ctrl+C to stop\n")
+        
+        ticker := time.NewTicker(time.Duration(intervalSeconds) * time.Second)
+        defer ticker.Stop()
+        
+        // Check immediately
+        staking, err := c.GetStaking(accountID, poolID)
+        if err != nil {
+            return err
+        }
+        
+        for {
+            unstaked, _ := YoctoToNear(staking.UnstakedBalance)
+            timestamp := time.Now().Format("15:04:05")
+            status := "⏳"
+            if staking.CanWithdraw {
+                status = "✅"
+            }
+            
+            fmt.Printf("[%s] Unstaked: %s NEAR - Can withdraw: %s\n", 
+                timestamp, unstaked, status)
+            
+            if staking.CanWithdraw {
+                fmt.Println("✅ Funds ready for withdrawal!")
+                break
+            }
+            
+            <-ticker.C
+            staking, err = c.GetStaking(accountID, poolID)
+            if err != nil {
+                fmt.Printf("Error: %v\n", err)
+                continue
+            }
+        }
+        
+        return nil
+    }
+
+    func main() {
+        client := NewStakingClient("YOUR_KEY")
+        
+        // Display staking position
+        err := client.DisplayStaking("therealmagyar.near", "shadowcorp.pool.near")
+        if err != nil {
+            panic(err)
+        }
+        
+        // Check withdrawal status
+        canWithdraw, err := client.CanWithdraw("alice.near", "pool.near")
+        if err != nil {
+            panic(err)
+        }
+        
+        if canWithdraw {
+            fmt.Println("\n✅ Can withdraw unstaked funds")
+        } else {
+            fmt.Println("\n⏳ Unstaking still in progress")
+        }
+        
+        // Monitor unstaking (uncomment to use)
+        // client.MonitorUnstaking("alice.near", "pool.near", 30)
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Response Format
+
+<ResponseField name="account_id" type="string" required>
+  The NEAR account identifier that owns this staking position.
+</ResponseField>
+
+<ResponseField name="pool_id" type="string" required>
+  The validator pool account ID where funds are staked.
+</ResponseField>
+
+<ResponseField name="staked_balance" type="string" required>
+  Currently staked balance in yoctoNEAR (10^-24 NEAR). These funds are actively earning staking rewards.
+  
+  **Note:** Divide by 10^24 to convert to NEAR.
+</ResponseField>
+
+<ResponseField name="unstaked_balance" type="string" required>
+  Unstaked balance in yoctoNEAR awaiting withdrawal. These funds have been unstaked but may still be locked.
+  
+  **Unstaking Period:** Typically 2-4 epochs (~52-104 hours) on NEAR Protocol.
+</ResponseField>
+
+<ResponseField name="can_withdraw" type="boolean" required>
+  Whether unstaked funds can be withdrawn immediately.
+  
+  - `true` - Funds have completed the unstaking period and can be withdrawn
+  - `false` - Funds are still locked and awaiting the unstaking period to complete
+</ResponseField>
+
+### Success Response (200 OK)
+
+**Active Staking Position (therealmagyar.near in shadowcorp.pool.near):**
+```json
+{
+  "account_id": "therealmagyar.near",
+  "pool_id": "shadowcorp.pool.near",
+  "staked_balance": "100086222688140095978706",
+  "unstaked_balance": "2450189691282827051472744",
+  "can_withdraw": true
+}
+```
+
+**Conversion to NEAR:**
+```javascript
+// staked_balance: 100086222688140095978706 yoctoNEAR
+// = 100.086222 NEAR (actively staking)
+
+// unstaked_balance: 2450189691282827051472744 yoctoNEAR
+// = 2450.189691 NEAR (ready to withdraw)
+```
+
+**Only Staked Funds:**
+```json
+{
+  "account_id": "alice.near",
+  "pool_id": "pool.near",
+  "staked_balance": "1000000000000000000000000000",
+  "unstaked_balance": "0",
+  "can_withdraw": false
+}
+```
+
+**Unstaking in Progress:**
+```json
+{
+  "account_id": "bob.near",
+  "pool_id": "zavodil.poolv1.near",
+  "staked_balance": "0",
+  "unstaked_balance": "500000000000000000000000000",
+  "can_withdraw": false
+}
+```
+
+**Ready for Withdrawal:**
+```json
+{
+  "account_id": "charlie.near",
+  "pool_id": "staked.poolv1.near",
+  "staked_balance": "2000000000000000000000000000",
+  "unstaked_balance": "300000000000000000000000000",
+  "can_withdraw": true
+}
+```
+
+<Check>
+  A `200 OK` status code indicates the staking position was retrieved successfully. Zero balances mean no funds in that state.
+</Check>
+
+<Note>
+  **Unstaking Timeline:** After initiating unstaking, funds typically take 2-4 epochs (52-104 hours) before `can_withdraw` becomes `true`.
+</Note>
+
+## Understanding NEAR Staking
+
+<AccordionGroup>
+  <Accordion title="Staking States" icon="layer-group">
+    NEAR staking has distinct states your funds can be in:
+    
+    **Staked (`staked_balance`):**
+    - Actively earning rewards (~10-12% APY)
+    - Locked and cannot be transferred
+    - Validator is using these funds to secure the network
+    - Rewards compound automatically
+    
+    **Unstaked (`unstaked_balance`):**
+    - No longer earning rewards
+    - Still locked during unstaking period
+    - Waiting to become withdrawable
+    - Cannot be re-staked without withdrawing first
+    
+    **Withdrawable (`can_withdraw: true`):**
+    - Unstaking period completed
+    - Can be withdrawn to available balance
+    - No longer associated with the validator
+    - Returns to liquid NEAR in your account
+    
+    ```javascript
+    function getStakingState(staking) {
+      if (parseFloat(staking.staked_balance) > 0) {
+        return 'Earning rewards';
+      }
+      if (parseFloat(staking.unstaked_balance) > 0) {
+        return staking.can_withdraw ? 'Ready to withdraw' : 'Unstaking in progress';
+      }
+      return 'No position';
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Unstaking Timeline" icon="clock">
+    Understanding the unstaking process and timeline:
+    
+    **NEAR Protocol Epochs:**
+    - 1 epoch ≈ 12 hours
+    - Unstaking requires 2-4 epochs
+    - Total wait time: 24-48 hours typically
+    - Can vary based on network conditions
+    
+    **Unstaking Flow:**
+    ```
+    1. Stake Active (earning rewards)
+         ↓
+    2. Initiate Unstake
+         ↓
+    3. Epoch 1: Waiting (can_withdraw: false)
+         ↓
+    4. Epoch 2: Waiting (can_withdraw: false)
+         ↓
+    5. Epoch 3+: Ready (can_withdraw: true)
+         ↓
+    6. Withdraw to available balance
+    ```
+    
+    **Monitoring Example:**
+    ```javascript
+    async function monitorUnstaking(accountId, poolId) {
+      const startTime = Date.now();
+      
+      const check = async () => {
+        const staking = await getStaking(accountId, poolId);
+        const hoursElapsed = (Date.now() - startTime) / (1000 * 60 * 60);
+        
+        console.log(`⏳ Hours elapsed: ${hoursElapsed.toFixed(1)}`);
+        console.log(`   Status: ${staking.can_withdraw ? '✅ Ready' : '⏳ Waiting'}`);
+        
+        return staking.can_withdraw;
+      };
+      
+      while (!(await check())) {
+        await new Promise(resolve => setTimeout(resolve, 3600000)); // Check hourly
+      }
+      
+      console.log('✅ Unstaking complete!');
+    }
+    ```
+    
+    <Info>
+      Plan for 48-72 hours when unstaking to account for potential delays. The wait time ensures network security.
+    </Info>
+  </Accordion>
+  
+  <Accordion title="Staking Rewards" icon="coins">
+    How rewards work with NEAR staking:
+    
+    **Reward Rate:**
+    - Typical APY: 10-12%
+    - Varies by validator
+    - Paid every epoch (~12 hours)
+    - Automatically compounded
+    
+    **Calculating Returns:**
+    ```javascript
+    function calculateAnnualRewards(stakedAmount, apy = 0.11) {
+      const stakedNear = parseFloat(yoctoToNear(stakedAmount));
+      return stakedNear * apy;
+    }
+    
+    function calculateDailyRewards(stakedAmount, apy = 0.11) {
+      const annual = calculateAnnualRewards(stakedAmount, apy);
+      return annual / 365;
+    }
+    
+    // Example
+    const staking = await getStaking('alice.near', 'pool.near');
+    const dailyReward = calculateDailyRewards(staking.staked_balance);
+    console.log(`Daily rewards: ${dailyReward.toFixed(6)} NEAR`);
+    ```
+    
+    **Reward Distribution:**
+    - Rewards appear as increased `staked_balance`
+    - No separate claim required
+    - Compounds automatically
+    - Visible in balance increases over time
+    
+    <Tip>
+      Compare APY rates across validators before choosing where to stake. Higher APY isn't always better - consider validator reliability and fees.
+    </Tip>
+  </Accordion>
+  
+  <Accordion title="Validator Selection" icon="server">
+    Choosing the right validator pool:
+    
+    **Key Factors:**
+    - **Fee:** Validators charge 1-10% commission
+    - **Uptime:** High uptime = consistent rewards
+    - **Stake:** Larger pools = more stability
+    - **Reputation:** Community trust and track record
+    
+    **Popular Validators:**
+    ```javascript
+    const RECOMMENDED_POOLS = [
+      {
+        id: 'pool.near',
+        name: 'NEAR Foundation',
+        fee: '10%',
+        reputation: 'Official'
+      },
+      {
+        id: 'shadowcorp.pool.near',
+        name: 'ShadowCorp',
+        fee: '3%',
+        reputation: 'Community'
+      },
+      {
+        id: 'zavodil.poolv1.near',
+        name: 'Zavodil',
+        fee: '2%',
+        reputation: 'Established'
+      },
+      {
+        id: 'staked.poolv1.near',
+        name: 'Staked',
+        fee: '5%',
+        reputation: 'Professional'
+      }
+    ];
+    ```
+    
+    **Diversification:**
+    ```javascript
+    // Split stake across multiple validators
+    async function diversifyStake(accountId, totalAmount) {
+      const allocation = {
+        'pool.near': 0.40,              // 40% to main pool
+        'shadowcorp.pool.near': 0.30,   // 30% to low-fee pool
+        'zavodil.poolv1.near': 0.30     // 30% to community pool
+      };
+      
+      for (const [pool, percentage] of Object.entries(allocation)) {
+        const amount = totalAmount * percentage;
+        console.log(`Stake ${amount} NEAR in ${pool}`);
+      }
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Staking Dashboards" icon="chart-line" color="#3b82f6">
+    Build comprehensive staking dashboards showing positions across all validators.
+  </Card>
+  
+  <Card title="Withdrawal Automation" icon="robot" color="#10b981">
+    Automate withdrawal of unstaked funds once the unstaking period completes.
+  </Card>
+  
+  <Card title="Reward Tracking" icon="coins" color="#f59e0b">
+    Monitor staking rewards and calculate returns over time.
+  </Card>
+  
+  <Card title="Portfolio Management" icon="briefcase" color="#8b5cf6">
+    Track total staking across multiple pools and accounts.
+  </Card>
+</CardGroup>
+
+## Advanced Example: Staking Manager
+
+Here's a complete staking management system:
+
+```javascript
+class StakingManager {
+  constructor(apiKey) {
+    this.apiKey = apiKey;
+    this.baseUrl = 'https://api.shadowcorp.dev';
+    this.commonPools = [
+      'shadowcorp.pool.near',
+      'pool.near',
+      'zavodil.poolv1.near',
+      'staked.poolv1.near',
+      'aurora.pool.near',
+      'bisontrails.poolv1.near',
+      'chorus-one.poolv1.near'
+    ];
+  }
+
+  yoctoToNear(yocto) {
+    return Number(BigInt(yocto)) / 1e24;
+  }
+
+  async getStaking(accountId, poolId) {
+    const response = await fetch(
+      `${this.baseUrl}/v1/accounts/${accountId}/staking?pool=${poolId}`,
+      {
+        headers: { 'X-API-Key': this.apiKey }
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch staking: ${response.statusText}`);
+    }
+
+    return await response.json();
+  }
+
+  async getAllStakingPositions(accountId) {
+    console.log(`🔍 Scanning all pools for ${accountId}...\n`);
+    
+    const positions = [];
+    
+    for (const pool of this.commonPools) {
+      try {
+        const staking = await this.getStaking(accountId, pool);
+        const staked = this.yoctoToNear(staking.staked_balance);
+        const unstaked = this.yoctoToNear(staking.unstaked_balance);
+        
+        // Only include pools with balance
+        if (staked > 0 || unstaked > 0) {
+          positions.push({
+            pool: pool,
+            staked: staked,
+            unstaked: unstaked,
+            total: staked + unstaked,
+            canWithdraw: staking.can_withdraw
+          });
+        }
+      } catch (error) {
+        // Pool might not exist or no position
+        continue;
+      }
+    }
+    
+    return positions;
+  }
+
+  async generateStakingReport(accountId) {
+    const positions = await this.getAllStakingPositions(accountId);
+    
+    if (positions.length === 0) {
+      console.log(`No staking positions found for ${accountId}\n`);
+      return;
+    }
+
+    const totalStaked = positions.reduce((sum, p) => sum + p.staked, 0);
+    const totalUnstaked = positions.reduce((sum, p) => sum + p.unstaked, 0);
+    const totalValue = totalStaked + totalUnstaked;
+    const withdrawable = positions
+      .filter(p => p.canWithdraw && p.unstaked > 0)
+      .reduce((sum, p) => sum + p.unstaked, 0);
+
+    console.log('='.repeat(80));
+    console.log(`Staking Report: ${accountId}`);
+    console.log('='.repeat(80));
+    
+    console.log(`\n📊 Summary:`);
+    console.log(`  Total Staked: ${totalStaked.toFixed(6)} NEAR`);
+    console.log(`  Total Unstaked: ${totalUnstaked.toFixed(6)} NEAR`);
+    console.log(`  Total Value: ${totalValue.toFixed(6)} NEAR`);
+    console.log(`  Withdrawable: ${withdrawable.toFixed(6)} NEAR`);
+    console.log(`  Positions: ${positions.length} pools`);
+
+    console.log(`\n💼 Positions:`);
+    console.log('─'.repeat(80));
+    console.log(
+      'Pool'.padEnd(35) + 
+      'Staked'.padEnd(18) + 
+      'Unstaked'.padEnd(18) + 
+      'Status'
+    );
+    console.log('─'.repeat(80));
+
+    positions
+      .sort((a, b) => b.total - a.total)
+      .forEach(pos => {
+        const pool = pos.pool.substring(0, 33);
+        const staked = `${pos.staked.toFixed(6)} NEAR`;
+        const unstaked = `${pos.unstaked.toFixed(6)} NEAR`;
+        const status = pos.unstaked > 0
+          ? (pos.canWithdraw ? '✅ Withdrawable' : '⏳ Unstaking')
+          : '💰 Active';
+        
+        console.log(
+          pool.padEnd(35) +
+          staked.padEnd(18) +
+          unstaked.padEnd(18) +
+          status
+        );
+      });
+
+    console.log('─'.repeat(80));
+
+    // Calculate estimated annual rewards
+    const estimatedAPY = 0.11; // 11%
+    const annualRewards = totalStaked * estimatedAPY;
+    const monthlyRewards = annualRewards / 12;
+    const dailyRewards = annualRewards / 365;
+
+    console.log(`\n💵 Estimated Rewards (11% APY):`);
+    console.log(`  Daily: ${dailyRewards.toFixed(6)} NEAR`);
+    console.log(`  Monthly: ${monthlyRewards.toFixed(6)} NEAR`);
+    console.log(`  Annual: ${annualRewards.toFixed(6)} NEAR`);
+
+    console.log('='.repeat(80) + '\n');
+
+    return {
+      positions,
+      summary: {
+        totalStaked,
+        totalUnstaked,
+        totalValue,
+        withdrawable,
+        positionCount: positions.length
+      },
+      rewards: {
+        daily: dailyRewards,
+        monthly: monthlyRewards,
+        annual: annualRewards
+      }
+    };
+  }
+
+  async findWithdrawable(accountId) {
+    console.log(`💰 Checking for withdrawable funds...\n`);
+    
+    const positions = await this.getAllStakingPositions(accountId);
+    const withdrawable = positions.filter(p => 
+      p.canWithdraw && p.unstaked > 0
+    );
+
+    if (withdrawable.length === 0) {
+      console.log('No withdrawable funds found.\n');
+      return [];
+    }
+
+    console.log(`Found ${withdrawable.length} pool(s) with withdrawable funds:\n`);
+    
+    withdrawable.forEach(pos => {
+      console.log(`  ${pos.pool}: ${pos.unstaked.toFixed(6)} NEAR`);
+    });
+
+    const total = withdrawable.reduce((sum, p) => sum + p.unstaked, 0);
+    console.log(`\n  Total Withdrawable: ${total.toFixed(6)} NEAR\n`);
+
+    return withdrawable;
+  }
+
+  async monitorUnstaking(accountId, poolId, callbackFn, intervalMs = 60000) {
+    console.log(`⏳ Monitoring unstaking for ${accountId} in ${poolId}...`);
+    console.log(`Checking every ${intervalMs / 1000} seconds\n`);
+    
+    let lastStatus = null;
+    const startTime = Date.now();
+
+    const check = async () => {
+      try {
+        const staking = await this.getStaking(accountId, poolId);
+        const unstaked = this.yoctoToNear(staking.unstaked_balance);
+        const hoursElapsed = (Date.now() - startTime) / (1000 * 60 * 60);
+        
+        const status = {
+          unstaked: unstaked,
+          canWithdraw: staking.can_withdraw,
+          hoursElapsed: hoursElapsed.toFixed(1)
+        };
+
+        // Call callback if status changed
+        if (lastStatus === null || 
+            lastStatus.canWithdraw !== status.canWithdraw) {
+          if (callbackFn) {
+            callbackFn(status);
+          }
+          
+          const timestamp = new Date().toLocaleTimeString();
+          console.log(`[${timestamp}] Unstaked: ${unstaked.toFixed(6)} NEAR - Can withdraw: ${status.canWithdraw ? '✅' : '⏳'}`);
+          console.log(`  Hours elapsed: ${status.hoursElapsed}`);
+        }
+
+        lastStatus = status;
+
+        if (staking.can_withdraw) {
+          console.log('\n✅ Unstaking complete! Funds ready for withdrawal.\n');
+          return true;
+        }
+
+        return false;
+      } catch (error) {
+        console.error(`Error checking status: ${error.message}`);
+        return false;
+      }
+    };
+
+    // Initial check
+    if (await check()) return;
+
+    // Set up interval
+    const intervalId = setInterval(async () => {
+      if (await check()) {
+        clearInterval(intervalId);
+      }
+    }, intervalMs);
+
+    return () => clearInterval(intervalId);
+  }
+
+  async compareRewards(accountId, pools) {
+    console.log(`📊 Comparing rewards across ${pools.length} pools...\n`);
+    
+    const comparisons = [];
+    
+    for (const pool of pools) {
+      try {
+        const staking = await this.getStaking(accountId, pool);
+        const staked = this.yoctoToNear(staking.staked_balance);
+        
+        if (staked > 0) {
+          // Calculate estimated rewards at different APY rates
+          const conservativeAPY = 0.09; // 9%
+          const averageAPY = 0.11;      // 11%
+          const optimisticAPY = 0.13;   // 13%
+          
+          comparisons.push({
+            pool: pool,
+            staked: staked,
+            conservative: staked * conservativeAPY,
+            average: staked * averageAPY,
+            optimistic: staked * optimisticAPY
+          });
+        }
+      } catch (error) {
+        continue;
+      }
+    }
+
+    console.log('Annual Reward Estimates:');
+    console.log('─'.repeat(90));
+    console.log(
+      'Pool'.padEnd(35) +
+      'Staked'.padEnd(18) +
+      'Conservative (9%)'.padEnd(20) +
+      'Optimistic (13%)'
+    );
+    console.log('─'.repeat(90));
+
+    comparisons.forEach(comp => {
+      console.log(
+        comp.pool.substring(0, 33).padEnd(35) +
+        `${comp.staked.toFixed(2)} NEAR`.padEnd(18) +
+        `${comp.conservative.toFixed(2)} NEAR`.padEnd(20) +
+        `${comp.optimistic.toFixed(2)} NEAR`
+      );
+    });
+
+    console.log('─'.repeat(90) + '\n');
+
+    return comparisons;
+  }
+}
+
+// Usage Examples
+const manager = new StakingManager('YOUR_KEY');
+
+// Generate comprehensive report
+await manager.generateStakingReport('alice.near');
+
+// Find withdrawable funds
+await manager.findWithdrawable('alice.near');
+
+// Monitor unstaking with callback
+await manager.monitorUnstaking(
+  'alice.near',
+  'pool.near',
+  (status) => {
+    if (status.canWithdraw) {
+      console.log('🎉 Ready to withdraw!');
+      // Could trigger automatic withdrawal here
+    }
+  },
+  60000 // Check every minute
+);
+
+// Compare rewards across pools
+await manager.compareRewards('alice.near', [
+  'shadowcorp.pool.near',
+  'pool.near',
+  'zavodil.poolv1.near'
+]);
+```
+
+## Error Responses
+
+### 400 Bad Request
+
+```json
+{
+  "error": "Missing required parameter: pool",
+  "code": 400
+}
+```
+
+<Warning>
+  The `pool` query parameter is required. Specify a valid validator pool account ID.
+</Warning>
+
+### 401 Unauthorized
+
+```json
+{
+  "error": "Missing or invalid API key",
+  "code": 401
+}
+```
+
+### 404 Not Found
+
+```json
+{
+  "error": "Staking position not found",
+  "code": 404,
+  "account_id": "alice.near",
+  "pool_id": "invalid.pool.near"
+}
+```
+
+<Note>
+  A 404 error means either the account or pool doesn't exist, or the account has no staking position in that pool.
+</Note>
+
+### 500 Internal Server Error
+
+```json
+{
+  "error": "Failed to fetch staking data",
+  "code": 500
+}
+```
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+  <Card 
+    title="Full Account Data" 
+    icon="user-circle" 
+    href="/shadow-api/endpoints/full-account-data"
+  >
+    Get all staking positions across all pools
+  </Card>
+  
+  <Card 
+    title="Account Balance" 
+    icon="wallet" 
+    href="/shadow-api/endpoints/account-balance"
+  >
+    Check available NEAR balance
+  </Card>
+  
+  <Card 
+    title="Validators" 
+    icon="server" 
+    href="/shadow-api/endpoints/all-current-validators"
+  >
+    List all validator pools and their info
+  </Card>
+  
+  <Card 
+    title="Transactions" 
+    icon="receipt" 
+    href="/shadow-api/endpoints/transactions"
+  >
+    View staking transaction history
+  </Card>
+</CardGroup>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Pool Validation" icon="shield-check">
+    Always validate pool IDs before querying:
+    
+    ```javascript
+    const KNOWN_POOLS = new Set([
+      'shadowcorp.pool.near',
+      'pool.near',
+      'zavodil.poolv1.near',
+      'staked.poolv1.near',
+      'aurora.pool.near'
+    ]);
+    
+    function isValidPool(poolId) {
+      // Check basic format
+      if (!poolId.endsWith('.near') && !poolId.endsWith('.poolv1.near')) {
+        return false;
+      }
+      
+      // Check against known pools
+      return KNOWN_POOLS.has(poolId);
+    }
+    
+    // Use before querying
+    if (isValidPool(poolId)) {
+      const staking = await getStaking(accountId, poolId);
+    } else {
+      console.error('Invalid pool ID');
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Withdrawal Timing" icon="clock">
+    Monitor unstaking progress to withdraw at optimal times:
+    
+    ```javascript
+    async function waitForWithdrawal(accountId, poolId) {
+      const MAX_WAIT = 72; // hours
+      const CHECK_INTERVAL = 3600000; // 1 hour
+      const startTime = Date.now();
+      
+      while (true) {
+        const staking = await getStaking(accountId, poolId);
+        const hoursElapsed = (Date.now() - startTime) / (1000 * 60 * 60);
+        
+        if (staking.can_withdraw) {
+          return { success: true, hoursElapsed };
+        }
+        
+        if (hoursElapsed >= MAX_WAIT) {
+          return { 
+            success: false, 
+            reason: 'Timeout exceeded',
+            hoursElapsed 
+          };
+        }
+        
+        await new Promise(resolve => setTimeout(resolve, CHECK_INTERVAL));
+      }
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Error Handling" icon="triangle-exclamation">
+    Handle common staking query errors gracefully:
+    
+    ```javascript
+    async function safeGetStaking(accountId, poolId) {
+      try {
+        const response = await fetch(
+          `https://api.shadowcorp.dev/v1/accounts/${accountId}/staking?pool=${poolId}`,
+          { headers: { 'X-API-Key': 'YOUR_KEY' } }
+        );
+        
+        if (response.status === 404) {
+          return {
+            error: 'No staking position',
+            hasPosition: false
+          };
+        }
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        
+        return {
+          ...(await response.json()),
+          hasPosition: true
+        };
+      } catch (error) {
+        console.error(`Failed to fetch staking: ${error.message}`);
+        return {
+          error: error.message,
+          hasPosition: false
+        };
+      }
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Precision Handling" icon="calculator">
+    Use proper types for yoctoNEAR amounts:
+    
+    ```javascript
+    // ❌ WRONG - Loses precision
+    const wrong = parseInt("100086222688140095978706") / 1e24;
+    
+    // ✅ CORRECT - Preserves precision
+    const correct = Number(BigInt("100086222688140095978706")) / 1e24;
+    
+    // For comparisons, stay in yoctoNEAR
+    const staked = BigInt(staking.staked_balance);
+    const unstaked = BigInt(staking.unstaked_balance);
+    const total = staked + unstaked;
+    
+    // Convert only for display
+    const totalNear = Number(total) / 1e24;
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Performance Tips
+
+<Tip>
+  **Optimize Staking Queries:**
+  - Cache staking positions for 5-10 minutes
+  - Query specific pools instead of scanning all pools
+  - Use batch requests with delays when checking multiple pools
+  - Monitor unstaking status less frequently (every 30-60 minutes)
+</Tip>
+
+<Note>
+  Staking balances change less frequently than regular balances. Implement longer cache durations for staking data to reduce API calls.
+</Note>

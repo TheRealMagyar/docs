@@ -1,0 +1,305 @@
+---
+title: Network Statistics
+description: Get comprehensive real-time statistics about the NEAR blockchain network, including block heights, transaction counts, and transfer metrics.
+icon: chart-line
+---
+
+import { Endpoint } from '@mintlify/components';
+
+<Endpoint method="GET" path="/v1/stats" />
+
+<Info>
+  This endpoint requires authentication. Make sure to include your API key in the request headers.
+</Info>
+
+## Making Requests
+
+<Tabs>
+  <Tab title="cURL">
+    ```bash
+    curl -H "X-API-Key: YOUR_KEY" https://api.shadowcorp.dev/v1/stats
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    const getNetworkStats = async () => {
+      const response = await fetch('https://api.shadowcorp.dev/v1/stats', {
+        headers: {
+          'X-API-Key': 'YOUR_KEY'
+        }
+      });
+      const data = await response.json();
+      console.log('Network Stats:', data);
+    };
+
+    getNetworkStats();
+    ```
+  </Tab>
+  
+  <Tab title="Python">
+    ```python
+    import requests
+
+    headers = {
+        'X-API-Key': 'YOUR_KEY'
+    }
+
+    response = requests.get(
+        'https://api.shadowcorp.dev/v1/stats',
+        headers=headers
+    )
+    print('Network Stats:', response.json())
+    ```
+  </Tab>
+  
+  <Tab title="Go">
+    ```go
+    package main
+
+    import (
+        "encoding/json"
+        "fmt"
+        "net/http"
+    )
+
+    func main() {
+        client := &http.Client{}
+        req, err := http.NewRequest("GET", "https://api.shadowcorp.dev/v1/stats", nil)
+        if err != nil {
+            panic(err)
+        }
+        
+        req.Header.Add("X-API-Key", "YOUR_KEY")
+        
+        resp, err := client.Do(req)
+        if err != nil {
+            panic(err)
+        }
+        defer resp.Body.Close()
+
+        var result map[string]interface{}
+        json.NewDecoder(resp.Body).Decode(&result)
+        fmt.Println("Network Stats:", result)
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Response Format
+
+<ResponseField name="latest_block_height" type="integer" required>
+  The height of the most recently processed block on the NEAR blockchain.
+</ResponseField>
+
+<ResponseField name="latest_block_timestamp" type="string" required>
+  ISO 8601 timestamp of when the latest block was created.
+</ResponseField>
+
+<ResponseField name="total_transactions" type="integer" required>
+  Total number of transactions indexed by the API.
+</ResponseField>
+
+<ResponseField name="total_ft_transfers" type="integer" required>
+  Total number of fungible token (FT) transfers recorded.
+</ResponseField>
+
+<ResponseField name="total_nft_transfers" type="integer" required>
+  Total number of non-fungible token (NFT) transfers recorded.
+</ResponseField>
+
+### Success Response (200 OK)
+
+```json
+{
+  "latest_block_height": 179321914,
+  "latest_block_timestamp": "2026-01-01T20:57:29.641844Z",
+  "total_transactions": 17966163,
+  "total_ft_transfers": 12788521,
+  "total_nft_transfers": 9491
+}
+```
+
+<Check>
+  A `200 OK` status code indicates the statistics were retrieved successfully.
+</Check>
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Network Monitoring" icon="chart-area" color="#3b82f6">
+    Track blockchain growth and activity over time by polling these statistics regularly.
+  </Card>
+  
+  <Card title="Dashboard Integration" icon="gauge" color="#8b5cf6">
+    Display real-time network metrics on your application's status dashboard.
+  </Card>
+  
+  <Card title="Analytics" icon="chart-pie" color="#10b981">
+    Analyze transaction patterns and token transfer trends for research or reporting.
+  </Card>
+  
+  <Card title="Health Monitoring" icon="heartbeat" color="#f59e0b">
+    Monitor blockchain indexing status and detect potential synchronization issues.
+  </Card>
+</CardGroup>
+
+## Understanding the Metrics
+
+<AccordionGroup>
+  <Accordion title="Latest Block Height" icon="blocks">
+    The block height represents the total number of blocks that have been added to the blockchain since genesis. This number continuously increases as new blocks are produced.
+    
+    **Update frequency:** Approximately every 1-2 seconds on NEAR Protocol.
+  </Accordion>
+  
+  <Accordion title="Latest Block Timestamp" icon="clock">
+    The exact time when the most recent block was created and added to the blockchain. This timestamp is in UTC and follows the ISO 8601 format.
+    
+    **Use case:** Verify how fresh the indexed data is by comparing this with the current time.
+  </Accordion>
+  
+  <Accordion title="Total Transactions" icon="arrows-turn-right">
+    Cumulative count of all transaction records indexed by the ShadowCorp API. This includes all transaction types on NEAR blockchain.
+    
+    **Note:** This metric only includes transactions that have been indexed by our system.
+  </Accordion>
+  
+  <Accordion title="FT Transfers" icon="coins">
+    Total number of fungible token transfer events, including transfers of tokens like USDT, wrapped NEAR, and other NEP-141 compliant tokens.
+    
+    **Growth rate:** Typically grows faster than NFT transfers due to DeFi and trading activity.
+  </Accordion>
+  
+  <Accordion title="NFT Transfers" icon="image">
+    Total count of non-fungible token (NEP-171) transfer events, including mints, sales, and transfers of digital collectibles.
+    
+    **Insight:** Compare this with FT transfers to understand the ratio of collectible vs. fungible token activity.
+  </Accordion>
+</AccordionGroup>
+
+## Example: Building a Statistics Dashboard
+
+Here's a complete example of fetching and displaying network statistics:
+
+```javascript
+class NetworkStatsMonitor {
+  constructor(apiKey) {
+    this.apiKey = apiKey;
+    this.baseUrl = 'https://api.shadowcorp.dev';
+  }
+
+  async getStats() {
+    try {
+      const response = await fetch(`${this.baseUrl}/v1/stats`, {
+        headers: {
+          'X-API-Key': this.apiKey
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching network stats:', error);
+      throw error;
+    }
+  }
+
+  async displayStats() {
+    const stats = await this.getStats();
+    
+    console.log('📊 NEAR Network Statistics');
+    console.log('━'.repeat(50));
+    console.log(`📦 Latest Block: #${stats.latest_block_height.toLocaleString()}`);
+    console.log(`⏰ Block Time: ${new Date(stats.latest_block_timestamp).toLocaleString()}`);
+    console.log(`💳 Total Transactions: ${stats.total_transactions.toLocaleString()}`);
+    console.log(`🪙 FT Transfers: ${stats.total_ft_transfers.toLocaleString()}`);
+    console.log(`🖼️  NFT Transfers: ${stats.total_nft_transfers.toLocaleString()}`);
+    
+    // Calculate derived metrics
+    const ftPercentage = ((stats.total_ft_transfers / stats.total_transactions) * 100).toFixed(2);
+    console.log(`\n📈 FT transfers represent ${ftPercentage}% of all transactions`);
+  }
+
+  async monitorContinuously(intervalMs = 10000) {
+    console.log(`🔄 Starting continuous monitoring (every ${intervalMs/1000}s)...`);
+    
+    await this.displayStats();
+    setInterval(async () => {
+      await this.displayStats();
+    }, intervalMs);
+  }
+}
+
+// Usage
+const monitor = new NetworkStatsMonitor('YOUR_KEY');
+monitor.displayStats();
+```
+
+<Tip>
+  Poll this endpoint every 10-30 seconds for real-time monitoring, or less frequently for general statistics tracking.
+</Tip>
+
+## Error Responses
+
+<Warning>
+  Make sure to include your API key in the `X-API-Key` header, otherwise you'll receive a `401 Unauthorized` error.
+</Warning>
+
+### 401 Unauthorized
+
+```json
+{
+  "error": "Missing or invalid API key",
+  "code": 401
+}
+```
+
+### 429 Rate Limit Exceeded
+
+```json
+{
+  "error": "Rate limit exceeded",
+  "code": 429,
+  "retry_after": 60
+}
+```
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+  <Card 
+    title="List Blocks" 
+    icon="cube" 
+    href="/shadow-api/endpoints/blocks"
+  >
+    Retrieve detailed information about individual blocks
+  </Card>
+  
+  <Card 
+    title="List Transactions" 
+    icon="swap" 
+    href="/shadow-api/endpoints/transactions"
+  >
+    Query transactions with filtering and pagination
+  </Card>
+  
+  <Card 
+    title="FT Transfers" 
+    icon="coins" 
+    href="/shadow-api/endpoints/ft-transfers"
+  >
+    Get detailed fungible token transfer history
+  </Card>
+  
+  <Card 
+    title="NFT Transfers" 
+    icon="image" 
+    href="/shadow-api/endpoints/nft-transfers"
+  >
+    Access NFT transfer records and metadata
+  </Card>
+</CardGroup>

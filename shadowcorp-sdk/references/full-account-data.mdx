@@ -1,0 +1,539 @@
+---
+title: "Full Account Data"
+description: "Get comprehensive account information in a single API call. This endpoint aggregates balance, token holdings, NFTs, staking positions, account labels, risk scores, and cluster analysis."
+icon: user-circle
+---
+
+import { Callout } from '@/components/ui/callout'
+
+## Get Full Account Data
+
+```typescript
+import { ShadowCorpSDK } from 'shadowcorp';
+
+const sdk = new ShadowCorpSDK('your-api-key');
+
+const account = await sdk.accounts.getFull('example.near');
+console.log(account);
+```
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `accountId` | `string` | Yes | NEAR account identifier (e.g., 'example.near') |
+
+### Response Structure
+
+```typescript
+{
+  account_id: string;                 // Account identifier
+  state: {                            // Native NEAR balance state
+    amount: string;                   // Liquid balance (yoctoNEAR)
+    locked: string;                   // Locked balance (yoctoNEAR)
+    storage_usage: number;            // Storage used in bytes
+    code_hash: string;                // Contract code hash
+  };
+  transaction_count: number;          // Total transaction count
+  tokens: Array<{                     // Fungible token holdings
+    token_id: string;                 // Token contract ID
+    balance: string;                  // Token balance
+  }>;
+  nfts: Array<{                       // NFT holdings
+    contract_id: string;              // NFT contract ID
+    token_ids: string[];              // Owned token IDs
+  }>;
+  staking: {                          // Staking information
+    pools: Array<{                    // Validator pools
+      pool_id: string;
+      staked_balance: string;
+      unstaked_balance: string;
+    }>;
+    total_staked: string;             // Total staked across all pools
+    recent_events: Array<any>;        // Recent staking events
+  };
+  labels: string[];                   // Account classification labels
+  risk_score: number | null;          // Risk assessment score (0-100)
+  cluster: string | null;             // Account cluster/group identifier
+}
+```
+
+### Example Response
+
+```json
+{
+  "account_id": "therealmagyar.near",
+  "state": {
+    "amount": "12817632130134446609948969",
+    "locked": "0",
+    "storage_usage": 182,
+    "code_hash": "11111111111111111111111111111111"
+  },
+  "transaction_count": 25,
+  "tokens": [],
+  "nfts": [],
+  "staking": {
+    "pools": [],
+    "total_staked": "0",
+    "recent_events": []
+  },
+  "labels": [],
+  "risk_score": null,
+  "cluster": null
+}
+```
+
+### Error Handling
+
+```typescript
+try {
+  const account = await sdk.accounts.getFull('nonexistent.near');
+} catch (error) {
+  if (error.message.includes('not found')) {
+    console.log('Account does not exist');
+  } else {
+    console.error('Query failed:', error);
+  }
+}
+```
+
+## Understanding Account Data
+
+### Account State
+
+The `state` object contains native NEAR balance information:
+
+```typescript
+function formatNEAR(yoctoNEAR: string): string {
+  const amount = BigInt(yoctoNEAR);
+  const divisor = BigInt('1000000000000000000000000');
+  const whole = amount / divisor;
+  const fraction = amount % divisor;
+  const fractionStr = fraction.toString().padStart(24, '0').substring(0, 4);
+  return `${whole}.${fractionStr}`;
+}
+
+const account = await sdk.accounts.getFull('therealmagyar.near');
+console.log(`Balance: ${formatNEAR(account.state.amount)} NEAR`);
+console.log(`Locked: ${formatNEAR(account.state.locked)} NEAR`);
+console.log(`Storage: ${account.state.storage_usage} bytes`);
+```
+
+### Transaction Count
+
+Total number of transactions involving this account:
+
+```typescript
+const account = await sdk.accounts.getFull('example.near');
+console.log(`Total transactions: ${account.transaction_count}`);
+```
+
+### Token Holdings
+
+Array of fungible token balances:
+
+```typescript
+async function getTokenHoldings(accountId: string) {
+  const account = await sdk.accounts.getFull(accountId);
+  
+  if (account.tokens.length === 0) {
+    return { hasTokens: false, tokens: [] };
+  }
+  
+  const holdings = await Promise.all(
+    account.tokens.map(async (token) => {
+      const metadata = await sdk.tokens.getMetadata(token.token_id);
+      const amount = BigInt(token.balance);
+      const divisor = BigInt(10 ** metadata.decimals);
+      const formatted = (Number(amount) / Number(divisor)).toFixed(metadata.decimals);
+      
+      return {
+        token: metadata.symbol,
+        amount: formatted,
+        contract: token.token_id
+      };
+    })
+  );
+  
+  return {
+    hasTokens: true,
+    tokenCount: holdings.length,
+    tokens: holdings
+  };
+}
+```
+
+### NFT Holdings
+
+Array of NFT collections and token IDs owned:
+
+```typescript
+async function getNFTHoldings(accountId: string) {
+  const account = await sdk.accounts.getFull(accountId);
+  
+  if (account.nfts.length === 0) {
+    return { hasNFTs: false, collections: [] };
+  }
+  
+  const totalNFTs = account.nfts.reduce((sum, nft) => sum + nft.token_ids.length, 0);
+  
+  return {
+    hasNFTs: true,
+    collectionCount: account.nfts.length,
+    totalNFTs,
+    collections: account.nfts.map(nft => ({
+      contract: nft.contract_id,
+      count: nft.token_ids.length,
+      tokens: nft.token_ids
+    }))
+  };
+}
+```
+
+### Staking Information
+
+Complete staking overview across all validator pools:
+
+```typescript
+const account = await sdk.accounts.getFull('example.near');
+
+if (account.staking.pools.length > 0) {
+  console.log(`Staking with ${account.staking.pools.length} pools`);
+  console.log(`Total staked: ${formatNEAR(account.staking.total_staked)} NEAR`);
+  
+  account.staking.pools.forEach(pool => {
+    console.log(`- ${pool.pool_id}: ${formatNEAR(pool.staked_balance)} NEAR`);
+  });
+}
+```
+
+### Labels
+
+Account classification labels for identification:
+
+```typescript
+const account = await sdk.accounts.getFull('example.near');
+
+if (account.labels.length > 0) {
+  console.log('Account labels:', account.labels.join(', '));
+  // Example: "Exchange", "High Value", "Active Trader"
+}
+```
+
+### Risk Score
+
+Risk assessment score (0-100, where higher = higher risk):
+
+```typescript
+const account = await sdk.accounts.getFull('example.near');
+
+if (account.risk_score !== null) {
+  let riskLevel = 'Low';
+  if (account.risk_score > 70) riskLevel = 'High';
+  else if (account.risk_score > 40) riskLevel = 'Medium';
+  
+  console.log(`Risk Score: ${account.risk_score}/100 (${riskLevel})`);
+}
+```
+
+### Cluster
+
+Account cluster or group identifier for related accounts:
+
+```typescript
+const account = await sdk.accounts.getFull('example.near');
+
+if (account.cluster) {
+  console.log(`Belongs to cluster: ${account.cluster}`);
+}
+```
+
+## Use Cases
+
+### Complete Account Profile
+
+Display comprehensive account information:
+
+```typescript
+async function getAccountProfile(accountId: string) {
+  const account = await sdk.accounts.getFull(accountId);
+  
+  const isContract = account.state.code_hash !== '11111111111111111111111111111111';
+  const totalBalance = BigInt(account.state.amount) + BigInt(account.state.locked);
+  
+  return {
+    accountId: account.account_id,
+    type: isContract ? 'Smart Contract' : 'EOA',
+    balance: {
+      liquid: formatNEAR(account.state.amount),
+      locked: formatNEAR(account.state.locked),
+      total: formatNEAR(totalBalance.toString())
+    },
+    activity: {
+      totalTransactions: account.transaction_count,
+      hasTokens: account.tokens.length > 0,
+      hasNFTs: account.nfts.length > 0,
+      hasStaking: account.staking.pools.length > 0
+    },
+    classification: {
+      labels: account.labels,
+      riskScore: account.risk_score,
+      cluster: account.cluster
+    }
+  };
+}
+
+const profile = await getAccountProfile('therealmagyar.near');
+console.log('Account Profile:', profile);
+```
+
+### Wealth Calculator
+
+Calculate total account wealth across all holdings:
+
+```typescript
+async function calculateTotalWealth(accountId: string) {
+  const account = await sdk.accounts.getFull(accountId);
+  
+  // NEAR balance
+  const nearBalance = BigInt(account.state.amount) + BigInt(account.state.locked);
+  const nearStaked = BigInt(account.staking.total_staked);
+  const totalNEAR = nearBalance + nearStaked;
+  
+  // Token count (would need prices for USD value)
+  const tokenCount = account.tokens.length;
+  const nftCount = account.nfts.reduce((sum, nft) => sum + nft.token_ids.length, 0);
+  
+  return {
+    near: {
+      liquid: formatNEAR(account.state.amount),
+      staked: formatNEAR(nearStaked.toString()),
+      total: formatNEAR(totalNEAR.toString())
+    },
+    assets: {
+      fungibleTokens: tokenCount,
+      nfts: nftCount,
+      nftCollections: account.nfts.length
+    }
+  };
+}
+
+const wealth = await calculateTotalWealth('example.near');
+console.log('Total Wealth:', wealth);
+```
+
+### Account Activity Analyzer
+
+Analyze account activity and engagement:
+
+```typescript
+async function analyzeActivity(accountId: string) {
+  const account = await sdk.accounts.getFull(accountId);
+  
+  const activityScore = 
+    (account.transaction_count > 0 ? 1 : 0) +
+    (account.tokens.length > 0 ? 1 : 0) +
+    (account.nfts.length > 0 ? 1 : 0) +
+    (account.staking.pools.length > 0 ? 1 : 0);
+  
+  let activityLevel = 'Inactive';
+  if (activityScore >= 3) activityLevel = 'Highly Active';
+  else if (activityScore >= 2) activityLevel = 'Active';
+  else if (activityScore >= 1) activityLevel = 'Low Activity';
+  
+  return {
+    accountId,
+    activityLevel,
+    activityScore: `${activityScore}/4`,
+    engagement: {
+      hasTransactions: account.transaction_count > 0,
+      holdsFungibleTokens: account.tokens.length > 0,
+      holdsNFTs: account.nfts.length > 0,
+      stakesNEAR: account.staking.pools.length > 0
+    },
+    metrics: {
+      transactions: account.transaction_count,
+      uniqueTokens: account.tokens.length,
+      nftCollections: account.nfts.length,
+      stakingPools: account.staking.pools.length
+    }
+  };
+}
+
+const activity = await analyzeActivity('example.near');
+console.log(`Activity Level: ${activity.activityLevel}`);
+console.table(activity.metrics);
+```
+
+### Portfolio Diversification
+
+Analyze portfolio diversification:
+
+```typescript
+async function analyzeDiversification(accountId: string) {
+  const account = await sdk.accounts.getFull(accountId);
+  
+  const nearValue = BigInt(account.state.amount) + BigInt(account.state.locked) + 
+                    BigInt(account.staking.total_staked);
+  
+  const hasNEAR = nearValue > 0n;
+  const hasTokens = account.tokens.length > 0;
+  const hasNFTs = account.nfts.length > 0;
+  const hasStaking = account.staking.pools.length > 0;
+  
+  const diversificationScore = [hasNEAR, hasTokens, hasNFTs, hasStaking].filter(Boolean).length;
+  
+  let rating = 'Poor';
+  if (diversificationScore === 4) rating = 'Excellent';
+  else if (diversificationScore === 3) rating = 'Good';
+  else if (diversificationScore === 2) rating = 'Fair';
+  
+  return {
+    rating,
+    score: `${diversificationScore}/4`,
+    breakdown: {
+      holdNEAR: hasNEAR,
+      holdTokens: hasTokens,
+      holdNFTs: hasNFTs,
+      hasStaking: hasStaking
+    },
+    recommendation: diversificationScore < 3 
+      ? 'Consider diversifying into more asset types'
+      : 'Well diversified portfolio'
+  };
+}
+
+const diversification = await analyzeDiversification('example.near');
+console.log(`Diversification: ${diversification.rating}`);
+console.log(diversification.recommendation);
+```
+
+### Risk Assessment Dashboard
+
+Comprehensive risk evaluation:
+
+```typescript
+async function assessRisk(accountId: string) {
+  const account = await sdk.accounts.getFull(accountId);
+  
+  const riskFactors = {
+    hasRiskScore: account.risk_score !== null,
+    riskScoreHigh: account.risk_score !== null && account.risk_score > 70,
+    lowBalance: BigInt(account.state.amount) < BigInt('1000000000000000000000000'), // < 1 NEAR
+    highTransactionVolume: account.transaction_count > 1000,
+    hasLabels: account.labels.length > 0,
+    inCluster: account.cluster !== null
+  };
+  
+  const alertCount = Object.values(riskFactors).filter(Boolean).length;
+  
+  return {
+    accountId,
+    riskScore: account.risk_score ?? 'N/A',
+    labels: account.labels,
+    cluster: account.cluster,
+    alerts: alertCount,
+    factors: riskFactors,
+    overallRisk: account.risk_score !== null && account.risk_score > 70
+      ? 'High Risk'
+      : 'Normal'
+  };
+}
+
+const risk = await assessRisk('example.near');
+console.log('Risk Assessment:', risk);
+```
+
+### Batch Account Comparison
+
+Compare multiple accounts side-by-side:
+
+```typescript
+async function compareAccounts(accountIds: string[]) {
+  const accounts = await Promise.all(
+    accountIds.map(id => sdk.accounts.getFull(id))
+  );
+  
+  return accounts.map(account => {
+    const totalBalance = BigInt(account.state.amount) + 
+                        BigInt(account.state.locked) +
+                        BigInt(account.staking.total_staked);
+    
+    return {
+      account: account.account_id,
+      balance: formatNEAR(totalBalance.toString()),
+      transactions: account.transaction_count,
+      tokens: account.tokens.length,
+      nfts: account.nfts.reduce((sum, nft) => sum + nft.token_ids.length, 0),
+      stakingPools: account.staking.pools.length,
+      riskScore: account.risk_score ?? 0
+    };
+  });
+}
+
+const comparison = await compareAccounts([
+  'alice.near',
+  'bob.near',
+  'charlie.near'
+]);
+
+console.table(comparison);
+```
+
+## Best Practices
+
+### Single Endpoint Efficiency
+
+<Callout type="tip">
+Use `getFull` instead of multiple individual API calls when you need comprehensive account data. It's more efficient than calling balance, tokens, NFTs, and staking separately.
+</Callout>
+
+```typescript
+// ❌ Inefficient - 4 API calls
+const balance = await sdk.accounts.getBalance('example.near');
+const staking = await sdk.accounts.getStaking('example.near');
+// ... more calls
+
+// ✅ Efficient - 1 API call
+const account = await sdk.accounts.getFull('example.near');
+```
+
+### Handle Empty Arrays
+
+Check for empty arrays before processing:
+
+```typescript
+const account = await sdk.accounts.getFull('example.near');
+
+if (account.tokens.length === 0) {
+  console.log('No token holdings');
+} else {
+  // Process tokens
+}
+```
+
+### Cache Full Account Data
+
+For dashboard applications, cache the full account response:
+
+```typescript
+class AccountCache {
+  private cache = new Map<string, { data: any; timestamp: number }>();
+  private ttl = 30000; // 30 seconds
+  
+  async get(accountId: string) {
+    const cached = this.cache.get(accountId);
+    
+    if (cached && Date.now() - cached.timestamp < this.ttl) {
+      return cached.data;
+    }
+    
+    const account = await sdk.accounts.getFull(accountId);
+    this.cache.set(accountId, { data: account, timestamp: Date.now() });
+    
+    return account;
+  }
+}
+```
+
+For support: [support@shadowcorp.dev](mailto:support@shadowcorp.dev)

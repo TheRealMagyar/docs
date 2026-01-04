@@ -1,0 +1,727 @@
+---
+title: Blocks
+description: Access comprehensive block data from the NEAR blockchain, including block heights, hashes, timestamps, and chunk information. Essential for blockchain explorers, validators, and analytics applications.
+icon: cube
+---
+
+import { Endpoint } from '@mintlify/components';
+
+## List Blocks
+
+<Endpoint method="GET" path="/v1/blocks" />
+
+Retrieve a paginated list of blocks from the NEAR blockchain in reverse chronological order (newest first).
+
+<Info>
+  Blocks are returned with the most recent first. Use pagination to navigate through historical blocks.
+</Info>
+
+### Query Parameters
+
+<ParamField query="limit" type="integer" default="50">
+  Number of blocks to return per request. Maximum: 100.
+</ParamField>
+
+<ParamField query="offset" type="integer" default="0">
+  Number of blocks to skip for pagination.
+</ParamField>
+
+### Making Requests
+
+<Tabs>
+  <Tab title="cURL">
+    ```bash
+    curl -H "X-API-Key: YOUR_KEY" \
+      "https://api.shadowcorp.dev/v1/blocks?limit=10"
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    const getBlocks = async (limit = 50, offset = 0) => {
+      const response = await fetch(
+        `https://api.shadowcorp.dev/v1/blocks?limit=${limit}&offset=${offset}`,
+        {
+          headers: {
+            'X-API-Key': 'YOUR_KEY'
+          }
+        }
+      );
+      return await response.json();
+    };
+
+    // Get latest blocks
+    const latestBlocks = await getBlocks(10);
+    console.log('Latest blocks:', latestBlocks);
+
+    // Paginate through blocks
+    const olderBlocks = await getBlocks(10, 10);
+    console.log('Next page:', olderBlocks);
+    ```
+  </Tab>
+  
+  <Tab title="Python">
+    ```python
+    import requests
+
+    class BlockAPI:
+        def __init__(self, api_key):
+            self.base_url = 'https://api.shadowcorp.dev'
+            self.headers = {'X-API-Key': api_key}
+        
+        def get_blocks(self, limit=50, offset=0):
+            """Get blocks with pagination"""
+            params = {'limit': limit, 'offset': offset}
+            response = requests.get(
+                f'{self.base_url}/v1/blocks',
+                headers=self.headers,
+                params=params
+            )
+            return response.json()
+        
+        def get_latest_block(self):
+            """Get the most recent block"""
+            result = self.get_blocks(limit=1)
+            return result['data'][0] if result['data'] else None
+
+    # Usage
+    api = BlockAPI('YOUR_KEY')
+    blocks = api.get_blocks(limit=10)
+    latest = api.get_latest_block()
+    print(f"Latest block height: {latest['block_height']}")
+    ```
+  </Tab>
+  
+  <Tab title="Go">
+    ```go
+    package main
+
+    import (
+        "encoding/json"
+        "fmt"
+        "net/http"
+        "net/url"
+    )
+
+    type BlockClient struct {
+        BaseURL string
+        APIKey  string
+        Client  *http.Client
+    }
+
+    type BlockResponse struct {
+        Data   []Block `json:"data"`
+        Total  int     `json:"total"`
+        Limit  int     `json:"limit"`
+        Offset int     `json:"offset"`
+    }
+
+    type Block struct {
+        BlockHeight     int64  `json:"block_height"`
+        BlockHash       string `json:"block_hash"`
+        BlockTimestamp  string `json:"block_timestamp"`
+        PrevHash        string `json:"prev_hash"`
+        EpochID         string `json:"epoch_id"`
+        ChunksIncluded  int    `json:"chunks_included"`
+    }
+
+    func NewBlockClient(apiKey string) *BlockClient {
+        return &BlockClient{
+            BaseURL: "https://api.shadowcorp.dev",
+            APIKey:  apiKey,
+            Client:  &http.Client{},
+        }
+    }
+
+    func (c *BlockClient) GetBlocks(limit, offset int) (*BlockResponse, error) {
+        params := url.Values{}
+        params.Add("limit", fmt.Sprintf("%d", limit))
+        params.Add("offset", fmt.Sprintf("%d", offset))
+        
+        reqURL := fmt.Sprintf("%s/v1/blocks?%s", c.BaseURL, params.Encode())
+        
+        req, err := http.NewRequest("GET", reqURL, nil)
+        if err != nil {
+            return nil, err
+        }
+        
+        req.Header.Add("X-API-Key", c.APIKey)
+        
+        resp, err := c.Client.Do(req)
+        if err != nil {
+            return nil, err
+        }
+        defer resp.Body.Close()
+
+        var result BlockResponse
+        json.NewDecoder(resp.Body).Decode(&result)
+        return &result, nil
+    }
+
+    func main() {
+        client := NewBlockClient("YOUR_KEY")
+        blocks, _ := client.GetBlocks(10, 0)
+        fmt.Printf("Latest block: %d\n", blocks.Data[0].BlockHeight)
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Response Format
+
+<ResponseField name="data" type="array" required>
+  Array of block objects.
+  
+  <Expandable title="Block Object">
+    <ResponseField name="block_height" type="integer">
+      The height (number) of this block in the blockchain.
+    </ResponseField>
+    
+    <ResponseField name="block_hash" type="string">
+      Unique hash identifier for this block (base58 encoded).
+    </ResponseField>
+    
+    <ResponseField name="block_timestamp" type="string">
+      ISO 8601 timestamp when this block was produced.
+    </ResponseField>
+    
+    <ResponseField name="prev_hash" type="string">
+      Hash of the previous block in the chain.
+    </ResponseField>
+    
+    <ResponseField name="epoch_id" type="string">
+      Identifier of the epoch this block belongs to.
+    </ResponseField>
+    
+    <ResponseField name="chunks_included" type="integer">
+      Number of shards (chunks) included in this block.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="total" type="integer" required>
+  Total number of blocks indexed by the API.
+</ResponseField>
+
+<ResponseField name="limit" type="integer" required>
+  Number of blocks returned in this response.
+</ResponseField>
+
+<ResponseField name="offset" type="integer" required>
+  Current pagination offset.
+</ResponseField>
+
+### Success Response (200 OK)
+
+```json
+{
+  "data": [
+    {
+      "block_height": 179321914,
+      "block_hash": "6UbAAx6k4NeC7mjx29F7E5RaeCC3fDgnTaVrkLvQMkTF",
+      "block_timestamp": "2026-01-01T20:57:29.641844Z",
+      "prev_hash": "EVDryZ971X9zgUAb7BQAH4XcRM9wiyfdieaBHNVeHiq6",
+      "epoch_id": "CWoBZXwvfq7arwQY43tBzHQSWeNYgGBJ5MLJhbg6vWMF",
+      "chunks_included": 9
+    }
+  ],
+  "total": 604329,
+  "limit": 1,
+  "offset": 0
+}
+```
+
+<Check>
+  A `200 OK` status code with the `data` array indicates success. The `total` field shows how many blocks have been indexed.
+</Check>
+
+## Understanding Block Fields
+
+<AccordionGroup>
+  <Accordion title="Block Height" icon="arrow-up-1-9">
+    The `block_height` is a sequential number that increases by 1 for each new block. It represents the block's position in the blockchain, starting from 0 at genesis.
+    
+    **Use case:** Use block height to track blockchain progress, identify specific blocks, or sync your application with the latest state.
+    
+    <Tip>
+      On NEAR Protocol, blocks are produced approximately every 1-2 seconds.
+    </Tip>
+  </Accordion>
+  
+  <Accordion title="Block Hash" icon="fingerprint">
+    The `block_hash` is a unique cryptographic identifier for this block. It's calculated from the block's contents and is used to reference this specific block.
+    
+    **Properties:**
+    - Base58 encoded string
+    - Globally unique
+    - Unchangeable once the block is finalized
+    
+    **Use case:** Use block hashes to verify block integrity or reference specific blocks in transactions.
+  </Accordion>
+  
+  <Accordion title="Previous Hash" icon="link">
+    The `prev_hash` links this block to its parent block, creating the blockchain. Each block references the hash of the block that came before it.
+    
+    This creates an immutable chain where any modification to a historical block would change all subsequent block hashes.
+    
+    **Use case:** Verify blockchain integrity or traverse the blockchain backwards.
+  </Accordion>
+  
+  <Accordion title="Epoch ID" icon="calendar">
+    NEAR blockchain is organized into epochs. An epoch is a period of time (approximately 12 hours) during which the validator set remains constant.
+    
+    The `epoch_id` identifies which epoch this block belongs to. When the epoch changes, the validator set may be updated based on staking changes.
+    
+    **Use case:** Track validator set changes or analyze epoch-based metrics.
+  </Accordion>
+  
+  <Accordion title="Chunks Included" icon="puzzle-piece">
+    NEAR uses sharding for scalability. Each block can contain up to several chunks (shards), with each chunk processing transactions for different accounts.
+    
+    The `chunks_included` field shows how many shards were active in this block. NEAR currently has multiple shards, but not all may be active in every block.
+    
+    **Normal value:** Typically 4-9 chunks per block depending on network activity.
+    
+    **Use case:** Monitor network activity and sharding efficiency.
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Get Block by Height
+
+<Endpoint method="GET" path="/v1/blocks/{height}" />
+
+Retrieve detailed information about a specific block using its block height.
+
+### Path Parameters
+
+<ParamField path="height" type="integer" required>
+  The block height (block number) to retrieve.
+</ParamField>
+
+### Making Requests
+
+<Tabs>
+  <Tab title="cURL">
+    ```bash
+    curl -H "X-API-Key: YOUR_KEY" \
+      https://api.shadowcorp.dev/v1/blocks/179321914
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    const getBlockByHeight = async (height) => {
+      const response = await fetch(
+        `https://api.shadowcorp.dev/v1/blocks/${height}`,
+        {
+          headers: {
+            'X-API-Key': 'YOUR_KEY'
+          }
+        }
+      );
+      
+      if (!response.ok) {
+        throw new Error(`Block not found: ${height}`);
+      }
+      
+      return await response.json();
+    };
+
+    // Usage
+    const block = await getBlockByHeight(179321914);
+    console.log('Block details:', block);
+    console.log(`Block produced at: ${new Date(block.block_timestamp).toLocaleString()}`);
+    ```
+  </Tab>
+  
+  <Tab title="Python">
+    ```python
+    import requests
+    from datetime import datetime
+
+    def get_block_by_height(api_key, height):
+        """Get block by height"""
+        response = requests.get(
+            f'https://api.shadowcorp.dev/v1/blocks/{height}',
+            headers={'X-API-Key': api_key}
+        )
+        response.raise_for_status()
+        return response.json()
+
+    # Usage
+    block = get_block_by_height('YOUR_KEY', 179321914)
+    print(f"Block Hash: {block['block_hash']}")
+    print(f"Produced at: {block['block_timestamp']}")
+    print(f"Chunks: {block['chunks_included']}")
+    ```
+  </Tab>
+  
+  <Tab title="Go">
+    ```go
+    func (c *BlockClient) GetBlockByHeight(height int64) (*Block, error) {
+        reqURL := fmt.Sprintf("%s/v1/blocks/%d", c.BaseURL, height)
+        
+        req, err := http.NewRequest("GET", reqURL, nil)
+        if err != nil {
+            return nil, err
+        }
+        
+        req.Header.Add("X-API-Key", c.APIKey)
+        
+        resp, err := c.Client.Do(req)
+        if err != nil {
+            return nil, err
+        }
+        defer resp.Body.Close()
+
+        if resp.StatusCode == 404 {
+            return nil, fmt.Errorf("block not found: %d", height)
+        }
+
+        var block Block
+        json.NewDecoder(resp.Body).Decode(&block)
+        return &block, nil
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Success Response (200 OK)
+
+```json
+{
+  "block_height": 179321914,
+  "block_hash": "6UbAAx6k4NeC7mjx29F7E5RaeCC3fDgnTaVrkLvQMkTF",
+  "block_timestamp": "2026-01-01T20:57:29.641844Z",
+  "prev_hash": "EVDryZ971X9zgUAb7BQAH4XcRM9wiyfdieaBHNVeHiq6",
+  "epoch_id": "CWoBZXwvfq7arwQY43tBzHQSWeNYgGBJ5MLJhbg6vWMF",
+  "chunks_included": 9
+}
+```
+
+<Check>
+  A `200 OK` status code indicates the block was found successfully.
+</Check>
+
+<Warning>
+  Returns a `404 Not Found` error if the block height doesn't exist or hasn't been indexed yet.
+</Warning>
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Block Explorer" icon="magnifying-glass" color="#3b82f6">
+    Build a blockchain explorer to display block information, navigate the chain, and view block details.
+  </Card>
+  
+  <Card title="Chain Monitoring" icon="chart-line" color="#8b5cf6">
+    Monitor blockchain health by tracking block production rates, epoch transitions, and chunk inclusion.
+  </Card>
+  
+  <Card title="Validator Analytics" icon="server" color="#10b981">
+    Analyze validator performance by tracking which validators produced blocks and when.
+  </Card>
+  
+  <Card title="Sync Applications" icon="arrows-rotate" color="#f59e0b">
+    Keep your application synchronized with the blockchain by polling for new blocks.
+  </Card>
+</CardGroup>
+
+## Advanced Example: Block Monitor
+
+Here's a complete example that monitors new blocks in real-time:
+
+```javascript
+class BlockMonitor {
+  constructor(apiKey) {
+    this.apiKey = apiKey;
+    this.baseUrl = 'https://api.shadowcorp.dev';
+    this.lastSeenHeight = null;
+    this.blockTimes = [];
+  }
+
+  async start(intervalMs = 2000) {
+    console.log('🚀 Starting block monitor...');
+    
+    // Get initial block
+    const initial = await this.getLatestBlock();
+    this.lastSeenHeight = initial.block_height;
+    console.log(`📦 Starting from block ${this.lastSeenHeight}`);
+    
+    // Poll for new blocks
+    setInterval(async () => {
+      await this.checkNewBlocks();
+    }, intervalMs);
+  }
+
+  async checkNewBlocks() {
+    try {
+      const latest = await this.getLatestBlock();
+      
+      if (latest.block_height > this.lastSeenHeight) {
+        const blocksProduced = latest.block_height - this.lastSeenHeight;
+        
+        if (blocksProduced > 1) {
+          console.log(`⚠️  Missed ${blocksProduced - 1} block(s)!`);
+        }
+        
+        // Calculate block time
+        const timeDiff = new Date(latest.block_timestamp) - new Date(this.lastBlockTimestamp);
+        this.blockTimes.push(timeDiff / 1000);
+        
+        // Keep only last 100 block times
+        if (this.blockTimes.length > 100) {
+          this.blockTimes.shift();
+        }
+        
+        const avgBlockTime = this.blockTimes.reduce((a, b) => a + b, 0) / this.blockTimes.length;
+        
+        console.log('🆕 New block detected:');
+        console.log(`   Height: ${latest.block_height}`);
+        console.log(`   Hash: ${latest.block_hash.substring(0, 10)}...`);
+        console.log(`   Chunks: ${latest.chunks_included}`);
+        console.log(`   Avg block time: ${avgBlockTime.toFixed(2)}s`);
+        
+        this.lastSeenHeight = latest.block_height;
+        this.lastBlockTimestamp = latest.block_timestamp;
+      }
+    } catch (error) {
+      console.error('❌ Error checking blocks:', error.message);
+    }
+  }
+
+  async getLatestBlock() {
+    const response = await fetch(
+      `${this.baseUrl}/v1/blocks?limit=1`,
+      {
+        headers: { 'X-API-Key': this.apiKey }
+      }
+    );
+    const data = await response.json();
+    return data.data[0];
+  }
+
+  async getBlockStats(count = 100) {
+    const response = await fetch(
+      `${this.baseUrl}/v1/blocks?limit=${count}`,
+      {
+        headers: { 'X-API-Key': this.apiKey }
+      }
+    );
+    const data = await response.json();
+    
+    // Analyze blocks
+    const blocks = data.data;
+    const chunkCounts = blocks.map(b => b.chunks_included);
+    const avgChunks = chunkCounts.reduce((a, b) => a + b, 0) / chunkCounts.length;
+    
+    // Calculate block time distribution
+    const blockTimes = [];
+    for (let i = 0; i < blocks.length - 1; i++) {
+      const time1 = new Date(blocks[i].block_timestamp);
+      const time2 = new Date(blocks[i + 1].block_timestamp);
+      blockTimes.push((time1 - time2) / 1000);
+    }
+    
+    const avgTime = blockTimes.reduce((a, b) => a + b, 0) / blockTimes.length;
+    const minTime = Math.min(...blockTimes);
+    const maxTime = Math.max(...blockTimes);
+    
+    console.log('📊 Block Statistics (last 100 blocks):');
+    console.log(`   Average chunks per block: ${avgChunks.toFixed(2)}`);
+    console.log(`   Average block time: ${avgTime.toFixed(2)}s`);
+    console.log(`   Min block time: ${minTime.toFixed(2)}s`);
+    console.log(`   Max block time: ${maxTime.toFixed(2)}s`);
+    
+    return {
+      avgChunks,
+      avgTime,
+      minTime,
+      maxTime,
+      totalBlocks: data.total
+    };
+  }
+}
+
+// Usage
+const monitor = new BlockMonitor('YOUR_KEY');
+
+// Show statistics
+await monitor.getBlockStats(100);
+
+// Start monitoring
+monitor.start(2000); // Check every 2 seconds
+```
+
+## Practical Examples
+
+### Example 1: Find Blocks in Time Range
+
+```javascript
+async function getBlocksInTimeRange(apiKey, startTime, endTime) {
+  const blocks = [];
+  let offset = 0;
+  const limit = 100;
+  
+  while (true) {
+    const response = await fetch(
+      `https://api.shadowcorp.dev/v1/blocks?limit=${limit}&offset=${offset}`,
+      { headers: { 'X-API-Key': apiKey } }
+    );
+    const data = await response.json();
+    
+    for (const block of data.data) {
+      const blockTime = new Date(block.block_timestamp);
+      
+      if (blockTime >= startTime && blockTime <= endTime) {
+        blocks.push(block);
+      }
+      
+      // If we've gone past the end time, stop
+      if (blockTime < startTime) {
+        return blocks;
+      }
+    }
+    
+    offset += limit;
+    
+    // Safety check
+    if (offset >= data.total) break;
+  }
+  
+  return blocks;
+}
+
+// Usage: Get all blocks from last hour
+const now = new Date();
+const oneHourAgo = new Date(now - 60 * 60 * 1000);
+const blocks = await getBlocksInTimeRange('YOUR_KEY', oneHourAgo, now);
+console.log(`Found ${blocks.length} blocks in the last hour`);
+```
+
+### Example 2: Calculate Network Health Metrics
+
+```python
+import requests
+from datetime import datetime, timedelta
+from statistics import mean, stdev
+
+def analyze_network_health(api_key, block_count=1000):
+    """Analyze network health based on recent blocks"""
+    
+    response = requests.get(
+        f'https://api.shadowcorp.dev/v1/blocks?limit={block_count}',
+        headers={'X-API-Key': api_key}
+    )
+    blocks = response.json()['data']
+    
+    # Calculate block time variations
+    block_times = []
+    for i in range(len(blocks) - 1):
+        t1 = datetime.fromisoformat(blocks[i]['block_timestamp'].replace('Z', '+00:00'))
+        t2 = datetime.fromisoformat(blocks[i+1]['block_timestamp'].replace('Z', '+00:00'))
+        block_times.append((t1 - t2).total_seconds())
+    
+    # Calculate chunk statistics
+    chunk_counts = [b['chunks_included'] for b in blocks]
+    
+    # Generate health report
+    report = {
+        'avg_block_time': mean(block_times),
+        'block_time_stdev': stdev(block_times),
+        'avg_chunks': mean(chunk_counts),
+        'min_chunks': min(chunk_counts),
+        'max_chunks': max(chunk_counts),
+        'blocks_analyzed': len(blocks)
+    }
+    
+    print("🏥 Network Health Report")
+    print(f"  Blocks analyzed: {report['blocks_analyzed']}")
+    print(f"  Avg block time: {report['avg_block_time']:.2f}s ± {report['block_time_stdev']:.2f}s")
+    print(f"  Avg chunks/block: {report['avg_chunks']:.1f}")
+    print(f"  Chunk range: {report['min_chunks']}-{report['max_chunks']}")
+    
+    # Health assessment
+    if report['avg_block_time'] < 2.0 and report['block_time_stdev'] < 1.0:
+        print("  Status: ✅ HEALTHY - Block production is stable")
+    elif report['avg_block_time'] < 3.0:
+        print("  Status: ⚠️  WARNING - Block times slightly elevated")
+    else:
+        print("  Status: 🚨 CRITICAL - Block production issues detected")
+    
+    return report
+
+# Usage
+analyze_network_health('YOUR_KEY', 1000)
+```
+
+## Error Responses
+
+### 400 Bad Request
+
+```json
+{
+  "error": "Invalid query parameters",
+  "code": 400
+}
+```
+
+### 401 Unauthorized
+
+```json
+{
+  "error": "Missing or invalid API key",
+  "code": 401
+}
+```
+
+### 404 Not Found
+
+```json
+{
+  "error": "Block not found",
+  "code": 404
+}
+```
+
+<Warning>
+  A `404` error when querying by height usually means the block hasn't been produced yet (future block) or hasn't been indexed.
+</Warning>
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+  <Card 
+    title="List Transactions" 
+    icon="swap" 
+    href="/shadow-api/endpoints/transactions"
+  >
+    Query transactions within specific blocks
+  </Card>
+  
+  <Card 
+    title="Network Statistics" 
+    icon="chart-line" 
+    href="/shadow-api/endpoints/stats"
+  >
+    Get overall network statistics including latest block height
+  </Card>
+  
+  <Card 
+    title="Validators" 
+    icon="server" 
+    href="/shadow-api/endpoints/all-current-validators"
+  >
+    View validator information and block production stats
+  </Card>
+  
+  <Card 
+    title="Graph Queries" 
+    icon="diagram-project" 
+    href="/shadow-api/endpoints/graph"
+  >
+    Perform advanced block chain analysis
+  </Card>
+</CardGroup>

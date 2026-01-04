@@ -1,0 +1,640 @@
+---
+title: "Anomaly Alerts"
+description: "Access real-time anomaly detection alerts for suspicious or unusual activity on the NEAR blockchain. Monitor security threats, unusual transaction patterns, and potential risks across accounts and the network."
+icon: triangle-exclamation
+---
+
+import { Callout } from '@/components/ui/callout'
+
+## List Alerts
+
+Query anomaly alerts with filtering options for account, severity, and time range.
+
+```typescript
+import { ShadowCorpSDK } from 'shadowcorp';
+
+const sdk = new ShadowCorpSDK('your-api-key');
+
+const alerts = await sdk.alerts.listAlerts({
+  account: 'suspicious.near'
+});
+console.log(alerts);
+```
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `limit` | `number` | No | Number of results to return (default: 50, max: 100) |
+| `offset` | `number` | No | Number of results to skip for pagination |
+| `account` | `string` | No | Filter alerts for specific account |
+| `severity` | `string` | No | Filter by severity level (`low`, `medium`, `high`, `critical`) |
+| `type` | `string` | No | Filter by alert type |
+
+<Callout type="info">
+Alerts are returned in reverse chronological order (newest first) by default.
+</Callout>
+
+### Response Structure
+
+```typescript
+{
+  data: Array<{
+    alert_id: number;                 // Unique alert identifier
+    triggered_at: string;             // ISO 8601 timestamp
+    block_height: number;             // Block where alert was triggered
+    triggering_account: string;       // Account that triggered the alert
+    severity: string;                 // Alert severity (low/medium/high/critical)
+    status: string;                   // Alert status (new/reviewed/resolved)
+  }>;
+  total: number;                      // Total number of matching alerts
+  limit: number;                      // Number of results per page
+  offset: number;                     // Current offset
+}
+```
+
+### Example Response
+
+```json
+{
+  "data": [
+    {
+      "alert_id": 1424587,
+      "triggered_at": "2026-01-03T18:20:21.819056Z",
+      "block_height": 147835574,
+      "triggering_account": "relay.tg",
+      "severity": "high",
+      "status": "new"
+    },
+    {
+      "alert_id": 1424586,
+      "triggered_at": "2026-01-03T18:20:21.584401Z",
+      "block_height": 147835574,
+      "triggering_account": "system",
+      "severity": "medium",
+      "status": "new"
+    },
+    {
+      "alert_id": 1424585,
+      "triggered_at": "2026-01-03T18:20:21.383334Z",
+      "block_height": 147835574,
+      "triggering_account": "relay.tg",
+      "severity": "high",
+      "status": "new"
+    }
+  ],
+  "total": 1424587,
+  "limit": 50,
+  "offset": 0
+}
+```
+
+### Error Handling
+
+```typescript
+try {
+  const alerts = await sdk.alerts.listAlerts({ account: 'example.near' });
+  console.log(`Found ${alerts.data.length} alerts`);
+} catch (error) {
+  console.error('Failed to fetch alerts:', error);
+}
+```
+
+## Understanding Alert Data
+
+### Severity Levels
+
+Alerts are categorized by severity to prioritize investigation:
+
+- **critical**: Immediate attention required (potential security breach, large unauthorized transfers)
+- **high**: High priority (unusual patterns, potential fraud)
+- **medium**: Notable activity (pattern deviations, moderate risk)
+- **low**: Minor anomalies (informational, monitoring)
+
+```typescript
+const alerts = await sdk.alerts.listAlerts({ limit: 100 });
+
+const bySeverity = {
+  critical: alerts.data.filter(a => a.severity === 'critical').length,
+  high: alerts.data.filter(a => a.severity === 'high').length,
+  medium: alerts.data.filter(a => a.severity === 'medium').length,
+  low: alerts.data.filter(a => a.severity === 'low').length
+};
+
+console.log('Alerts by severity:', bySeverity);
+```
+
+### Alert Status
+
+Track the lifecycle of alerts:
+
+- **new**: Recently triggered, not yet reviewed
+- **reviewed**: Examined by analyst or system
+- **resolved**: Investigated and closed
+
+```typescript
+const alerts = await sdk.alerts.listAlerts({ limit: 100 });
+
+const newAlerts = alerts.data.filter(a => a.status === 'new');
+console.log(`${newAlerts.length} unreviewed alerts`);
+```
+
+### Triggering Account
+
+The account that caused the alert to trigger:
+
+```typescript
+const alerts = await sdk.alerts.listAlerts({ account: 'relay.tg' });
+
+console.log(`${alerts.total} total alerts for relay.tg`);
+alerts.data.forEach(alert => {
+  console.log(`[${alert.severity}] Alert #${alert.alert_id} at ${alert.triggered_at}`);
+});
+```
+
+## Use Cases
+
+### Security Dashboard
+
+Monitor recent high-priority alerts:
+
+```typescript
+async function getSecurityDashboard() {
+  const [critical, high] = await Promise.all([
+    sdk.alerts.listAlerts({ severity: 'critical', limit: 10 }),
+    sdk.alerts.listAlerts({ severity: 'high', limit: 20 })
+  ]);
+  
+  const recentCritical = critical.data.filter(alert => {
+    const alertTime = new Date(alert.triggered_at);
+    const hourAgo = new Date(Date.now() - 3600000);
+    return alertTime > hourAgo;
+  });
+  
+  return {
+    criticalAlerts: {
+      total: critical.total,
+      recent: recentCritical.length,
+      latest: critical.data[0]
+    },
+    highAlerts: {
+      total: high.total,
+      recent: high.data.length
+    },
+    requiresAttention: recentCritical.length > 0
+  };
+}
+
+const dashboard = await getSecurityDashboard();
+if (dashboard.requiresAttention) {
+  console.log('⚠️ Critical alerts in the last hour!');
+}
+console.log(dashboard);
+```
+
+### Account Risk Monitor
+
+Monitor specific accounts for suspicious activity:
+
+```typescript
+async function monitorAccount(accountId: string) {
+  const alerts = await sdk.alerts.listAlerts({
+    account: accountId,
+    limit: 50
+  });
+  
+  if (alerts.data.length === 0) {
+    return {
+      accountId,
+      riskLevel: 'Clean',
+      alerts: 0
+    };
+  }
+  
+  const severityCounts = {
+    critical: alerts.data.filter(a => a.severity === 'critical').length,
+    high: alerts.data.filter(a => a.severity === 'high').length,
+    medium: alerts.data.filter(a => a.severity === 'medium').length,
+    low: alerts.data.filter(a => a.severity === 'low').length
+  };
+  
+  let riskLevel = 'Low';
+  if (severityCounts.critical > 0) riskLevel = 'Critical';
+  else if (severityCounts.high > 5) riskLevel = 'High';
+  else if (severityCounts.high > 0 || severityCounts.medium > 10) riskLevel = 'Medium';
+  
+  return {
+    accountId,
+    riskLevel,
+    totalAlerts: alerts.total,
+    recentAlerts: alerts.data.length,
+    bySeverity: severityCounts,
+    latestAlert: alerts.data[0]
+  };
+}
+
+const risk = await monitorAccount('relay.tg');
+console.log(`Risk Level: ${risk.riskLevel}`);
+console.log('Alert breakdown:', risk.bySeverity);
+```
+
+### Alert Stream Processor
+
+Process alerts in real-time:
+
+```typescript
+async function processAlertStream() {
+  const alerts = await sdk.alerts.listAlerts({
+    status: 'new',
+    limit: 100
+  });
+  
+  const processed = alerts.data.map(alert => {
+    const age = Date.now() - new Date(alert.triggered_at).getTime();
+    const ageMinutes = Math.floor(age / 60000);
+    
+    return {
+      alertId: alert.alert_id,
+      account: alert.triggering_account,
+      severity: alert.severity,
+      age: `${ageMinutes}m ago`,
+      requiresAction: alert.severity === 'critical' || 
+                     (alert.severity === 'high' && ageMinutes > 60)
+    };
+  });
+  
+  const urgent = processed.filter(a => a.requiresAction);
+  
+  return {
+    totalNew: alerts.data.length,
+    urgent: urgent.length,
+    alerts: urgent.length > 0 ? urgent : processed.slice(0, 10)
+  };
+}
+
+const stream = await processAlertStream();
+if (stream.urgent > 0) {
+  console.log(`🚨 ${stream.urgent} alerts require immediate action`);
+  console.table(stream.alerts);
+}
+```
+
+### Threat Intelligence
+
+Identify accounts with repeated anomalies:
+
+```typescript
+async function identifyThreatActors(minAlerts: number = 5) {
+  // Get recent high-severity alerts
+  const alerts = await sdk.alerts.listAlerts({
+    severity: 'high',
+    limit: 100
+  });
+  
+  // Count alerts per account
+  const accountCounts = new Map<string, number>();
+  
+  alerts.data.forEach(alert => {
+    const count = accountCounts.get(alert.triggering_account) || 0;
+    accountCounts.set(alert.triggering_account, count + 1);
+  });
+  
+  // Find accounts with multiple alerts
+  const threats = Array.from(accountCounts.entries())
+    .filter(([_, count]) => count >= minAlerts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([account, count]) => ({
+      account,
+      alertCount: count,
+      threat: count > 10 ? 'High' : count > 5 ? 'Medium' : 'Low'
+    }));
+  
+  return {
+    totalAccounts: accountCounts.size,
+    threatActors: threats.length,
+    accounts: threats
+  };
+}
+
+const threats = await identifyThreatActors(5);
+console.log(`Found ${threats.threatActors} accounts with 5+ high-severity alerts`);
+console.table(threats.accounts);
+```
+
+### Alert Timeline
+
+Visualize alert activity over time:
+
+```typescript
+async function getAlertTimeline(hours: number = 24) {
+  const alerts = await sdk.alerts.listAlerts({ limit: 100 });
+  
+  const cutoff = new Date(Date.now() - hours * 3600000);
+  const recent = alerts.data.filter(alert => 
+    new Date(alert.triggered_at) > cutoff
+  );
+  
+  // Group by hour
+  const byHour = new Map<string, number>();
+  
+  recent.forEach(alert => {
+    const hour = new Date(alert.triggered_at).toISOString().slice(0, 13);
+    byHour.set(hour, (byHour.get(hour) || 0) + 1);
+  });
+  
+  const timeline = Array.from(byHour.entries())
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([hour, count]) => ({
+      hour: new Date(hour).toLocaleString(),
+      alerts: count
+    }));
+  
+  return {
+    totalAlerts: recent.length,
+    timeRange: `Last ${hours} hours`,
+    timeline
+  };
+}
+
+const timeline = await getAlertTimeline(24);
+console.log(`${timeline.totalAlerts} alerts in last 24 hours`);
+console.table(timeline.timeline);
+```
+
+### Severity Distribution
+
+Analyze alert severity distribution:
+
+```typescript
+async function analyzeSeverityDistribution() {
+  const alerts = await sdk.alerts.listAlerts({ limit: 100 });
+  
+  const distribution = {
+    critical: 0,
+    high: 0,
+    medium: 0,
+    low: 0
+  };
+  
+  alerts.data.forEach(alert => {
+    distribution[alert.severity]++;
+  });
+  
+  const total = alerts.data.length;
+  
+  return {
+    total,
+    distribution,
+    percentages: {
+      critical: ((distribution.critical / total) * 100).toFixed(1) + '%',
+      high: ((distribution.high / total) * 100).toFixed(1) + '%',
+      medium: ((distribution.medium / total) * 100).toFixed(1) + '%',
+      low: ((distribution.low / total) * 100).toFixed(1) + '%'
+    }
+  };
+}
+
+const analysis = await analyzeSeverityDistribution();
+console.log('Severity Distribution:');
+console.log(analysis.percentages);
+```
+
+### Multi-Account Watchlist
+
+Monitor a list of accounts:
+
+```typescript
+async function monitorWatchlist(accounts: string[]) {
+  const results = await Promise.all(
+    accounts.map(async account => {
+      const alerts = await sdk.alerts.listAlerts({
+        account,
+        limit: 10
+      });
+      
+      return {
+        account,
+        totalAlerts: alerts.total,
+        recentAlerts: alerts.data.length,
+        highestSeverity: alerts.data[0]?.severity || 'none',
+        lastAlert: alerts.data[0]?.triggered_at || 'never'
+      };
+    })
+  );
+  
+  // Sort by total alerts
+  results.sort((a, b) => b.totalAlerts - a.totalAlerts);
+  
+  return {
+    watchlistSize: accounts.length,
+    accountsWithAlerts: results.filter(r => r.totalAlerts > 0).length,
+    accounts: results
+  };
+}
+
+const watchlist = await monitorWatchlist([
+  'relay.tg',
+  'system',
+  'suspicious.near'
+]);
+
+console.log(`Monitoring ${watchlist.watchlistSize} accounts`);
+console.table(watchlist.accounts);
+```
+
+### Alert Response Automation
+
+Automate responses to critical alerts:
+
+```typescript
+async function automateAlertResponse() {
+  const critical = await sdk.alerts.listAlerts({
+    severity: 'critical',
+    status: 'new',
+    limit: 10
+  });
+  
+  if (critical.data.length === 0) {
+    return { actionsNeeded: false };
+  }
+  
+  const actions = critical.data.map(alert => {
+    const age = Date.now() - new Date(alert.triggered_at).getTime();
+    const ageMinutes = Math.floor(age / 60000);
+    
+    let action = 'investigate';
+    if (ageMinutes < 5) action = 'urgent_review';
+    if (ageMinutes > 60) action = 'escalate';
+    
+    return {
+      alertId: alert.alert_id,
+      account: alert.triggering_account,
+      age: `${ageMinutes}m`,
+      recommendedAction: action,
+      priority: ageMinutes < 5 ? 'immediate' : 'high'
+    };
+  });
+  
+  return {
+    actionsNeeded: true,
+    criticalCount: critical.data.length,
+    actions: actions.sort((a, b) => 
+      a.priority === 'immediate' ? -1 : 1
+    )
+  };
+}
+
+const response = await automateAlertResponse();
+if (response.actionsNeeded) {
+  console.log(`🚨 ${response.criticalCount} critical alerts need attention`);
+  console.table(response.actions);
+}
+```
+
+### Network-Wide Alert Summary
+
+Get overall network security status:
+
+```typescript
+async function getNetworkSecurityStatus() {
+  const [recent, critical] = await Promise.all([
+    sdk.alerts.listAlerts({ limit: 100 }),
+    sdk.alerts.listAlerts({ severity: 'critical', limit: 10 })
+  ]);
+  
+  const last24h = recent.data.filter(alert => {
+    const alertTime = new Date(alert.triggered_at);
+    const dayAgo = new Date(Date.now() - 86400000);
+    return alertTime > dayAgo;
+  });
+  
+  const uniqueAccounts = new Set(
+    last24h.map(a => a.triggering_account)
+  ).size;
+  
+  return {
+    totalAlerts: recent.total,
+    last24Hours: last24h.length,
+    criticalActive: critical.data.length,
+    affectedAccounts: uniqueAccounts,
+    status: critical.data.length > 0 ? 'At Risk' : 'Normal'
+  };
+}
+
+const status = await getNetworkSecurityStatus();
+console.log('Network Security Status:', status.status);
+console.log(`${status.last24Hours} alerts in last 24h affecting ${status.affectedAccounts} accounts`);
+```
+
+## Best Practices
+
+### Prioritize by Severity
+
+<Callout type="tip">
+Always filter and process critical and high-severity alerts first to ensure timely response to security threats.
+</Callout>
+
+```typescript
+async function prioritizeAlerts() {
+  const critical = await sdk.alerts.listAlerts({ 
+    severity: 'critical',
+    status: 'new'
+  });
+  
+  // Process critical alerts immediately
+  if (critical.data.length > 0) {
+    console.log(`⚠️ ${critical.data.length} critical alerts requiring immediate attention`);
+    // Trigger automated response or notification
+  }
+  
+  return critical.data;
+}
+```
+
+### Implement Alert Pagination
+
+<Callout type="warning">
+With over 1.4M alerts in the system, always use pagination to avoid overwhelming your application.
+</Callout>
+
+```typescript
+async function* paginateAlerts(filters: any = {}) {
+  let offset = 0;
+  const limit = 100;
+  
+  while (true) {
+    const response = await sdk.alerts.listAlerts({
+      ...filters,
+      limit,
+      offset
+    });
+    
+    if (response.data.length === 0) break;
+    
+    yield response.data;
+    
+    if (response.data.length < limit) break;
+    offset += limit;
+  }
+}
+
+// Usage
+for await (const batch of paginateAlerts({ severity: 'high' })) {
+  console.log(`Processing ${batch.length} alerts`);
+  // Process batch
+}
+```
+
+### Set Up Real-Time Monitoring
+
+Poll for new alerts regularly:
+
+```typescript
+class AlertMonitor {
+  private lastAlertId: number | null = null;
+  
+  async checkForNew() {
+    const alerts = await sdk.alerts.listAlerts({ limit: 10 });
+    
+    if (!this.lastAlertId) {
+      this.lastAlertId = alerts.data[0]?.alert_id || 0;
+      return { newAlerts: [] };
+    }
+    
+    const newAlerts = alerts.data.filter(
+      alert => alert.alert_id > this.lastAlertId!
+    );
+    
+    if (newAlerts.length > 0) {
+      this.lastAlertId = alerts.data[0].alert_id;
+      console.log(`🔔 ${newAlerts.length} new alerts`);
+    }
+    
+    return { newAlerts };
+  }
+}
+
+const monitor = new AlertMonitor();
+setInterval(() => monitor.checkForNew(), 30000); // Check every 30s
+```
+
+### Filter by Time Range
+
+Use timestamps to focus on recent activity:
+
+```typescript
+async function getRecentAlerts(hoursAgo: number = 1) {
+  const alerts = await sdk.alerts.listAlerts({ limit: 100 });
+  
+  const cutoff = new Date(Date.now() - hoursAgo * 3600000);
+  
+  return alerts.data.filter(alert => 
+    new Date(alert.triggered_at) > cutoff
+  );
+}
+
+const recentCritical = await getRecentAlerts(1);
+console.log(`${recentCritical.length} alerts in last hour`);
+```
+
+For support: [support@shadowcorp.dev](mailto:support@shadowcorp.dev)

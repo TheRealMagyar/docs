@@ -1,0 +1,652 @@
+---
+title: "Graph"
+description: "Execute read-only Cypher queries against a Neo4j graph database containing NEAR blockchain relationships. Perform advanced forensic analysis, trace transaction flows, discover account connections, and investigate suspicious activity patterns."
+icon: network-wired
+---
+
+import { Callout } from '@/components/ui/callout'
+
+<Callout type="warning">
+**READ-ONLY ACCESS**: Only `MATCH`, `RETURN`, `WHERE`, `WITH`, `UNWIND`, and other read operations are allowed. Destructive operations (`CREATE`, `DELETE`, `SET`, `REMOVE`, `MERGE`) are blocked and will result in errors.
+</Callout>
+
+## Execute Query
+
+Run a Cypher query with optional parameters.
+
+```typescript
+import { ShadowCorpSDK } from 'shadowcorp';
+
+const sdk = new ShadowCorpSDK('your-api-key');
+
+// Search for connected accounts
+const connections = await sdk.graph.query({
+  query: 'MATCH (a:Account {id: $id})-[r]-(b:Account) RETURN a, r, b LIMIT 50',
+  params: { id: 'example.near' }
+});
+
+console.log(connections);
+```
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `query` | `string` | Yes | Cypher query string (read-only) |
+| `params` | `object` | No | Query parameters (recommended for safety) |
+
+### Query Structure
+
+```typescript
+{
+  query: string;    // Cypher query with $param placeholders
+  params?: {        // Parameter values
+    [key: string]: any;
+  };
+}
+```
+
+## Graph Schema
+
+The Neo4j database contains the following node types and relationships:
+
+### Node Types
+
+- **Account**: NEAR account nodes
+  - Properties: `id` (account_id), `created_at`, `balance`, etc.
+  
+- **Transaction**: Transaction nodes
+  - Properties: `hash`, `block_height`, `timestamp`, `status`, etc.
+  
+- **Token**: Token contract nodes
+  - Properties: `id` (contract_id), `symbol`, `decimals`, etc.
+
+### Relationship Types
+
+- **SENT**: Account sent transaction to another account
+- **RECEIVED**: Account received transaction from another account
+- **TRANSFERRED**: Token transfer between accounts
+- **STAKED**: Account staked with validator
+- **OWNS**: Account owns NFT or token
+
+## Common Query Patterns
+
+### Find Connected Accounts
+
+Discover accounts directly connected to a target:
+
+```typescript
+const connections = await sdk.graph.query({
+  query: `
+    MATCH (a:Account {id: $id})-[r]-(b:Account)
+    RETURN a.id as account, type(r) as relationship, b.id as connected
+    LIMIT 50
+  `,
+  params: { id: 'example.near' }
+});
+
+connections.forEach(row => {
+  console.log(`${row.account} --[${row.relationship}]--> ${row.connected}`);
+});
+```
+
+### Shortest Path Between Accounts
+
+Find the shortest path connecting two accounts:
+
+```typescript
+const path = await sdk.graph.query({
+  query: `
+    MATCH path = shortestPath(
+      (a:Account {id: $from})-[*..10]-(b:Account {id: $to})
+    )
+    RETURN path
+  `,
+  params: {
+    from: 'account1.near',
+    to: 'account2.near'
+  }
+});
+
+if (path.length > 0) {
+  console.log('Path found between accounts');
+} else {
+  console.log('No connection found within 10 hops');
+}
+```
+
+### Track Money Flow
+
+Trace transaction chains from a source account:
+
+```typescript
+const flow = await sdk.graph.query({
+  query: `
+    MATCH path = (src:Account {id: $id})-[:SENT*1..5]->(dest:Account)
+    RETURN path
+    LIMIT 20
+  `,
+  params: { id: 'suspicious.near' }
+});
+
+console.log(`Found ${flow.length} transaction chains`);
+```
+
+### Find High-Value Connections
+
+Identify accounts with significant transaction volumes:
+
+```typescript
+const highValue = await sdk.graph.query({
+  query: `
+    MATCH (a:Account {id: $id})-[r:SENT]->(b:Account)
+    WHERE r.amount > $threshold
+    RETURN b.id as recipient, sum(r.amount) as total_sent, count(r) as tx_count
+    ORDER BY total_sent DESC
+    LIMIT 10
+  `,
+  params: {
+    id: 'whale.near',
+    threshold: '1000000000000000000000000' // 1 NEAR in yocto
+  }
+});
+
+console.table(highValue);
+```
+
+### Discover Transaction Clusters
+
+Find tightly connected groups of accounts:
+
+```typescript
+const clusters = await sdk.graph.query({
+  query: `
+    MATCH (a:Account)-[r:SENT]->(b:Account)
+    WITH a, count(DISTINCT b) as connections
+    WHERE connections > $minConnections
+    RETURN a.id as account, connections
+    ORDER BY connections DESC
+    LIMIT 20
+  `,
+  params: { minConnections: 10 }
+});
+
+console.log('Accounts with 10+ connections:');
+console.table(clusters);
+```
+
+## Forensic Analysis Use Cases
+
+### Money Laundering Detection
+
+Identify circular transaction patterns:
+
+```typescript
+async function detectCircularFlow(accountId: string) {
+  const result = await sdk.graph.query({
+    query: `
+      MATCH path = (a:Account {id: $id})-[:SENT*3..6]->(a)
+      RETURN path
+      LIMIT 10
+    `,
+    params: { id: accountId }
+  });
+  
+  return {
+    accountId,
+    circularPaths: result.length,
+    suspicious: result.length > 0,
+    severity: result.length > 5 ? 'high' : result.length > 0 ? 'medium' : 'low'
+  };
+}
+
+const analysis = await detectCircularFlow('suspicious.near');
+console.log('Circular flow analysis:', analysis);
+```
+
+### Mixer Service Detection
+
+Find accounts acting as intermediaries for many accounts:
+
+```typescript
+async function detectMixerAccounts(minIncoming: number = 50) {
+  const result = await sdk.graph.query({
+    query: `
+      MATCH (sender:Account)-[:SENT]->(mixer:Account)-[:SENT]->(receiver:Account)
+      WITH mixer, 
+           count(DISTINCT sender) as unique_senders,
+           count(DISTINCT receiver) as unique_receivers
+      WHERE unique_senders >= $minIncoming 
+        AND unique_receivers >= $minIncoming
+      RETURN mixer.id as account, 
+             unique_senders, 
+             unique_receivers
+      ORDER BY unique_senders DESC
+      LIMIT 10
+    `,
+    params: { minIncoming }
+  });
+  
+  return result.map(row => ({
+    account: row.account,
+    senders: row.unique_senders,
+    receivers: row.unique_receivers,
+    mixerScore: (row.unique_senders + row.unique_receivers) / 2
+  }));
+}
+
+const mixers = await detectMixerAccounts(50);
+console.log('Potential mixer accounts:');
+console.table(mixers);
+```
+
+### Fund Dispersion Analysis
+
+Track how funds are dispersed from a source:
+
+```typescript
+async function analyzeFundDispersion(sourceAccount: string, depth: number = 3) {
+  const result = await sdk.graph.query({
+    query: `
+      MATCH path = (source:Account {id: $source})-[:SENT*1..$depth]->(dest:Account)
+      WITH dest, 
+           length(path) as hops,
+           relationships(path) as rels
+      RETURN dest.id as account,
+             hops,
+             size([r IN rels WHERE r.amount IS NOT NULL]) as transactions
+      ORDER BY hops, transactions DESC
+      LIMIT 100
+    `,
+    params: { source: sourceAccount, depth }
+  });
+  
+  // Group by depth
+  const byDepth = new Map<number, number>();
+  result.forEach(row => {
+    byDepth.set(row.hops, (byDepth.get(row.hops) || 0) + 1);
+  });
+  
+  return {
+    sourceAccount,
+    totalDestinations: result.length,
+    byDepth: Object.fromEntries(byDepth),
+    destinations: result
+  };
+}
+
+const dispersion = await analyzeFundDispersion('source.near', 4);
+console.log('Fund dispersion:', dispersion);
+```
+
+### Common Counterparty Analysis
+
+Find shared transaction partners between accounts:
+
+```typescript
+async function findCommonCounterparties(
+  account1: string,
+  account2: string
+) {
+  const result = await sdk.graph.query({
+    query: `
+      MATCH (a1:Account {id: $account1})-[:SENT|RECEIVED]-(common:Account)-[:SENT|RECEIVED]-(a2:Account {id: $account2})
+      RETURN DISTINCT common.id as counterparty,
+             count(*) as connection_strength
+      ORDER BY connection_strength DESC
+      LIMIT 20
+    `,
+    params: { account1, account2 }
+  });
+  
+  return {
+    account1,
+    account2,
+    commonCounterparties: result.length,
+    counterparties: result
+  };
+}
+
+const common = await findCommonCounterparties('alice.near', 'bob.near');
+console.log(`Found ${common.commonCounterparties} common counterparties`);
+```
+
+### Transaction Velocity Analysis
+
+Identify accounts with unusual transaction frequency:
+
+```typescript
+async function analyzeTransactionVelocity(minVelocity: number = 100) {
+  const result = await sdk.graph.query({
+    query: `
+      MATCH (a:Account)-[r:SENT]->()
+      WITH a, count(r) as tx_count
+      WHERE tx_count >= $minVelocity
+      RETURN a.id as account, 
+             tx_count,
+             tx_count / 30.0 as avg_daily_txs
+      ORDER BY tx_count DESC
+      LIMIT 20
+    `,
+    params: { minVelocity }
+  });
+  
+  return result.map(row => ({
+    account: row.account,
+    totalTxs: row.tx_count,
+    avgDaily: Math.round(row.avg_daily_txs)
+  }));
+}
+
+const velocity = await analyzeTransactionVelocity(100);
+console.log('High-velocity accounts:');
+console.table(velocity);
+```
+
+### Sybil Attack Detection
+
+Identify potential Sybil clusters (accounts controlled by same entity):
+
+```typescript
+async function detectSybilClusters(minClusterSize: number = 5) {
+  const result = await sdk.graph.query({
+    query: `
+      MATCH (a:Account)-[:SENT]->(b:Account)
+      WITH a, collect(DISTINCT b.id) as targets
+      WHERE size(targets) >= $minClusterSize
+      MATCH (a)-[:SENT]->(target:Account)
+      WHERE target.id IN targets
+      WITH a, targets, 
+           avg([t IN targets | size((a)-[:SENT]->(Account {id: t}))]) as avg_txs
+      RETURN a.id as controller,
+             size(targets) as cluster_size,
+             toInteger(avg_txs) as avg_txs_per_account
+      ORDER BY cluster_size DESC
+      LIMIT 10
+    `,
+    params: { minClusterSize }
+  });
+  
+  return result;
+}
+
+const sybils = await detectSybilClusters(5);
+console.log('Potential Sybil clusters:');
+console.table(sybils);
+```
+
+### Cross-Chain Bridge Analysis
+
+Track bridge activity patterns:
+
+```typescript
+async function analyzeBridgeActivity(bridgeAccount: string) {
+  const result = await sdk.graph.query({
+    query: `
+      MATCH (user:Account)-[r:SENT]->(bridge:Account {id: $bridge})
+      WITH user, sum(r.amount) as total_bridged, count(r) as bridge_count
+      WHERE total_bridged > 0
+      RETURN user.id as account,
+             bridge_count,
+             total_bridged
+      ORDER BY total_bridged DESC
+      LIMIT 50
+    `,
+    params: { bridge: bridgeAccount }
+  });
+  
+  return {
+    bridgeAccount,
+    totalUsers: result.length,
+    topUsers: result.slice(0, 10)
+  };
+}
+
+const bridge = await analyzeBridgeActivity('rainbow-bridge.near');
+console.log('Bridge activity:', bridge);
+```
+
+## Advanced Query Techniques
+
+### Using Aggregations
+
+```typescript
+const stats = await sdk.graph.query({
+  query: `
+    MATCH (a:Account {id: $id})-[r:SENT]->(b:Account)
+    RETURN count(r) as total_sent,
+           sum(r.amount) as total_amount,
+           avg(r.amount) as avg_amount,
+           count(DISTINCT b) as unique_recipients
+  `,
+  params: { id: 'example.near' }
+});
+
+console.log('Transaction statistics:', stats[0]);
+```
+
+### Pattern Matching with Multiple Conditions
+
+```typescript
+const suspicious = await sdk.graph.query({
+  query: `
+    MATCH (a:Account)-[r:SENT]->(b:Account)
+    WHERE r.amount > $largeAmount
+      AND r.timestamp > $recentTime
+      AND NOT (b)-[:SENT]->()
+    RETURN a.id as sender,
+           b.id as receiver,
+           r.amount as amount,
+           r.timestamp as when
+    LIMIT 20
+  `,
+  params: {
+    largeAmount: '10000000000000000000000000', // 10 NEAR
+    recentTime: Date.now() - 86400000 // 24 hours ago
+  }
+});
+
+console.log('Large recent transactions to inactive accounts:');
+console.table(suspicious);
+```
+
+### Temporal Analysis
+
+```typescript
+const temporal = await sdk.graph.query({
+  query: `
+    MATCH (a:Account {id: $id})-[r:SENT]->()
+    WITH r.timestamp as ts, count(*) as tx_count
+    ORDER BY ts
+    RETURN ts, tx_count
+  `,
+  params: { id: 'example.near' }
+});
+
+console.log('Transaction activity over time:', temporal);
+```
+
+## Best Practices
+
+### Use Parameterized Queries
+
+<Callout type="tip">
+Always use parameterized queries instead of string concatenation to prevent injection attacks and improve query performance.
+</Callout>
+
+```typescript
+// ❌ Unsafe - vulnerable to injection
+const result = await sdk.graph.query({
+  query: `MATCH (a:Account {id: '${accountId}'}) RETURN a`
+});
+
+// ✅ Safe - parameterized
+const result = await sdk.graph.query({
+  query: 'MATCH (a:Account {id: $id}) RETURN a',
+  params: { id: accountId }
+});
+```
+
+### Limit Result Sizes
+
+<Callout type="warning">
+Always use `LIMIT` clauses to prevent accidentally returning massive result sets that could overwhelm your application.
+</Callout>
+
+```typescript
+const result = await sdk.graph.query({
+  query: `
+    MATCH (a:Account)-[r]->(b:Account)
+    WHERE a.id = $id
+    RETURN a, r, b
+    LIMIT 100  // Always include a reasonable limit
+  `,
+  params: { id: 'example.near' }
+});
+```
+
+### Index Hint Usage
+
+For large graphs, use index hints when available:
+
+```typescript
+const result = await sdk.graph.query({
+  query: `
+    MATCH (a:Account {id: $id})
+    USING INDEX a:Account(id)
+    MATCH (a)-[r:SENT]->(b:Account)
+    RETURN b
+    LIMIT 50
+  `,
+  params: { id: 'example.near' }
+});
+```
+
+### Handle Empty Results
+
+```typescript
+async function safeGraphQuery(query: string, params?: any) {
+  try {
+    const result = await sdk.graph.query({ query, params });
+    
+    if (!result || result.length === 0) {
+      console.log('No results found');
+      return [];
+    }
+    
+    return result;
+  } catch (error) {
+    console.error('Query failed:', error);
+    return [];
+  }
+}
+```
+
+### Optimize Path Queries
+
+Limit path length to prevent long-running queries:
+
+```typescript
+// ❌ Could be very slow
+const path = await sdk.graph.query({
+  query: 'MATCH path = (a)-[*]-(b) RETURN path' // Unbounded
+});
+
+// ✅ Bounded and efficient
+const path = await sdk.graph.query({
+  query: 'MATCH path = (a)-[*1..5]-(b) RETURN path LIMIT 20',
+  params: { /* ... */ }
+});
+```
+
+## Query Examples Library
+
+### Find All Paths Between Accounts
+
+```typescript
+const allPaths = await sdk.graph.query({
+  query: `
+    MATCH path = (a:Account {id: $from})-[*1..4]-(b:Account {id: $to})
+    RETURN path
+    LIMIT 10
+  `,
+  params: { from: 'alice.near', to: 'bob.near' }
+});
+```
+
+### Top Transactors
+
+```typescript
+const topTransactors = await sdk.graph.query({
+  query: `
+    MATCH (a:Account)-[r:SENT]->()
+    RETURN a.id as account, count(r) as tx_count
+    ORDER BY tx_count DESC
+    LIMIT 20
+  `
+});
+```
+
+### Account Interaction Timeline
+
+```typescript
+const timeline = await sdk.graph.query({
+  query: `
+    MATCH (a:Account {id: $id})-[r]-(b:Account)
+    RETURN type(r) as interaction_type,
+           b.id as counterparty,
+           r.timestamp as when
+    ORDER BY when DESC
+    LIMIT 100
+  `,
+  params: { id: 'example.near' }
+});
+```
+
+## Cypher Cheat Sheet
+
+### Basic Patterns
+
+```cypher
+// Match all accounts
+MATCH (a:Account) RETURN a LIMIT 10
+
+// Match with properties
+MATCH (a:Account {id: 'example.near'}) RETURN a
+
+// Match relationships
+MATCH (a:Account)-[r:SENT]->(b:Account) RETURN a, r, b LIMIT 10
+
+// Match paths
+MATCH path = (a)-[*1..3]-(b) RETURN path LIMIT 10
+```
+
+### Filtering
+
+```cypher
+// WHERE clause
+MATCH (a:Account)-[r:SENT]->(b)
+WHERE r.amount > 1000000
+RETURN a, b, r
+
+// Multiple conditions
+WHERE a.id = 'example.near' AND r.amount > 1000000
+
+// Pattern in WHERE
+WHERE NOT (b)-[:SENT]->()
+```
+
+### Aggregations
+
+```cypher
+// Count, sum, avg
+MATCH (a:Account)-[r:SENT]->()
+RETURN a.id, count(r), sum(r.amount), avg(r.amount)
+
+// Group by
+MATCH (a)-[r:SENT]->(b)
+WITH a, count(r) as tx_count
+RETURN a.id, tx_count
+```
+
+For support: [support@shadowcorp.dev](mailto:support@shadowcorp.dev)

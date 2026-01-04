@@ -1,0 +1,1356 @@
+---
+title: Graph Database
+description: Execute Cypher queries against the Neo4j graph database for forensic blockchain analysis. Discover relationships, trace fund flows, and analyze network patterns.
+icon: network-wired
+---
+
+import { Endpoint, Request } from '@mintlify/components';
+
+## Execute Graph Query
+
+<Endpoint method="POST" path="/v1/graph" />
+
+Execute read-only Cypher queries against the Neo4j graph database containing NEAR blockchain data. Analyze account relationships, trace transaction flows, and discover network patterns through graph traversal.
+
+<Info>
+  This endpoint provides powerful forensic analysis capabilities through graph queries. All queries are read-only to ensure data integrity.
+</Info>
+
+### Request Body
+
+<ParamField body="query" type="string" required>
+  Cypher query to execute. Must be a valid read-only query (SELECT, MATCH, RETURN, WHERE, etc.).
+  
+  **Destructive operations are blocked:**
+  - CREATE
+  - DELETE
+  - SET
+  - MERGE
+  - REMOVE
+  - Any write operations
+  
+  **Examples:**
+  - `MATCH (a:Account)-[r]->(b:Account) RETURN a.id, type(r), b.id LIMIT 10`
+  - `MATCH (a:Account {id: $id})-[r]-(b) RETURN a, r, b LIMIT 50`
+  - `MATCH path = shortestPath((a:Account {id: $from})-[*..10]-(b:Account {id: $to})) RETURN path`
+</ParamField>
+
+<ParamField body="params" type="object">
+  Optional parameters to use in the query. Parameters are referenced in the query using `$paramName` syntax.
+  
+  **Example:**
+  ```json
+  {
+    "id": "example.near",
+    "from": "sender.near",
+    "to": "receiver.near",
+    "min_amount": 1000
+  }
+  ```
+</ParamField>
+
+### Making Requests
+
+<Tabs>
+  <Tab title="cURL">
+    **Basic query:**
+    ```bash
+    curl -X POST https://api.shadowcorp.dev/v1/graph \
+      -H "Content-Type: application/json" \
+      -H "X-API-Key: YOUR_KEY" \
+      -d '{"query": "MATCH (a:Account)-[r]->(b:Account) RETURN a.id, type(r), b.id LIMIT 10"}'
+    ```
+
+    **With parameters:**
+    ```bash
+    curl -X POST https://api.shadowcorp.dev/v1/graph \
+      -H "Content-Type: application/json" \
+      -H "X-API-Key: YOUR_KEY" \
+      -d '{
+        "query": "MATCH (a:Account {id: $id})-[r]-(b) RETURN a, r, b LIMIT 50",
+        "params": {"id": "example.near"}
+      }'
+    ```
+
+    **Find shortest path:**
+    ```bash
+    curl -X POST https://api.shadowcorp.dev/v1/graph \
+      -H "Content-Type: application/json" \
+      -H "X-API-Key: YOUR_KEY" \
+      -d '{
+        "query": "MATCH path = shortestPath((a:Account {id: $from})-[*..10]-(b:Account {id: $to})) RETURN path",
+        "params": {"from": "sender.near", "to": "receiver.near"}
+      }'
+    ```
+
+    **Track fund flow:**
+    ```bash
+    curl -X POST https://api.shadowcorp.dev/v1/graph \
+      -H "Content-Type: application/json" \
+      -H "X-API-Key: YOUR_KEY" \
+      -d '{
+        "query": "MATCH path = (src:Account {id: $id})-[:SENT*1..5]->(dest:Account) RETURN path LIMIT 20",
+        "params": {"id": "suspicious.near"}
+      }'
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    // Graph Query Client for ShadowCorp NEAR Graph API
+class ShadowCorpGraphClient {
+  constructor(apiKey) {
+    if (!apiKey) {
+      throw new Error('API key is required');
+    }
+    this.apiKey = apiKey;
+    this.baseUrl = 'https://api.shadowcorp.dev/v1/graph';
+  }
+
+  async executeQuery(query, params = {}) {
+    try {
+      const response = await fetch(this.baseUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-Key': this.apiKey,
+        },
+        body: JSON.stringify({ query, params }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => '');
+        throw new Error(
+          `Graph API error: ${response.status} ${response.statusText} - ${errorText}`
+        );
+      }
+
+      const data = await response.json();
+
+      // Handle common error format from API
+      if (data.error) {
+        throw new Error(`Graph query error: ${data.error}`);
+      }
+
+      return data;
+    } catch (err) {
+      console.error('Graph query failed:', err);
+      throw err;
+    }
+  }
+
+  // Convert tabular results (columns + data rows) to array of objects
+  parseTabularResults(response) {
+    if (!response || !response.columns || !response.data) {
+      return [];
+    }
+
+    return response.data.map((row) =>
+      response.columns.reduce((obj, col, idx) => {
+        obj[col] = row[idx];
+        return obj;
+      }, {})
+    );
+  }
+
+  // Find direct connections (in/out) for an account
+  async findConnections(accountId, limit = 50) {
+    if (!accountId) throw new Error('accountId is required');
+
+    const query = `
+      MATCH (a:Account {id: $id})-[r]-(b:Account)
+      RETURN 
+        a.id AS source,
+        type(r) AS relationship,
+        b.id AS target,
+        properties(r) AS properties
+      ORDER BY relationship
+      LIMIT $limit
+    `;
+
+    const result = await this.executeQuery(query, { id: accountId, limit });
+    return this.parseTabularResults(result);
+  }
+
+  // Trace outgoing fund flows up to maxDepth
+  async traceFundFlow(sourceAccount, maxDepth = 5, limit = 20) {
+    if (!sourceAccount) throw new Error('sourceAccount is required');
+    if (maxDepth < 1 || maxDepth > 10) {
+      throw new Error('maxDepth must be between 1 and 10');
+    }
+
+    const query = `
+      MATCH path = (src:Account {id: $id})-[:SENT*1..${maxDepth}]->(dest:Account)
+      WHERE ALL(rel IN relationships(path) WHERE rel.amount IS NOT NULL)
+      RETURN path
+      ORDER BY length(path)
+      LIMIT $limit
+    `;
+
+    const result = await this.executeQuery(query, { id: sourceAccount, limit });
+    return result.data || []; // Path queries return `data` as array of paths
+  }
+
+  // Find shortest path between two accounts
+  async findShortestPath(from, to, maxHops = 10) {
+    if (!from || !to) throw new Error('Both from and to account IDs are required');
+    if (maxHops < 1 || maxHops > 20) {
+      throw new Error('maxHops must be between 1 and 20');
+    }
+
+    const query = `
+      MATCH path = shortestPath(
+        (a:Account {id: $from})-[*..${maxHops}]-(b:Account {id: $to})
+      )
+      RETURN path
+    `;
+
+    const result = await this.executeQuery(query, { from, to });
+    return result.data && result.data.length > 0 ? result.data[0] : null;
+  }
+}
+
+// === Usage Example ===
+async function main() {
+  // NEVER hardcode keys in production or shared code!
+  // Use environment variables or secure injection
+  const client = new ShadowCorpGraphClient('your api key');
+
+  try {
+    // 1. Find direct connections
+    const connections = await client.findConnections('therealmagyar.near', 30);
+    console.log(`Found ${connections.length} direct connections:\n`);
+    connections.forEach((conn) => {
+      console.log(`${conn.source} --[${conn.relationship}]--> ${conn.target}`);
+    });
+
+    // 2. Trace fund flows
+    const flows = await client.traceFundFlow('therealmagyar.near', 3);
+    console.log(`\nFound ${flows.length} outgoing fund flow paths (depth ≤3)`);
+
+    // 3. Find shortest path
+    const shortest = await client.findShortestPath('therealmagyar.near', 'shadowcorp.near');
+    if (shortest) {
+      console.log('\nShortest path found:', shortest);
+    } else {
+      console.log('\nNo path found between the accounts');
+    }
+  } catch (error) {
+    console.error('Operation failed:', error.message);
+  }
+}
+
+// Run example
+main();
+    ```
+  </Tab>
+  
+  <Tab title="Python">
+    ```python
+    import requests
+    import json
+
+    class GraphQueryAPI:
+        def __init__(self, api_key):
+            self.base_url = 'https://api.shadowcorp.dev'
+            self.headers = {
+                'Content-Type': 'application/json',
+                'X-API-Key': api_key
+            }
+        
+        def execute_query(self, query, params=None):
+            """Execute a Cypher query"""
+            payload = {'query': query}
+            if params:
+                payload['params'] = params
+            
+            response = requests.post(
+                f'{self.base_url}/v1/graph',
+                headers=self.headers,
+                json=payload
+            )
+            return response.json()
+        
+        def parse_results(self, response):
+            """Convert Neo4j response to list of dictionaries"""
+            if 'data' not in response or not response['data']:
+                return []
+            
+            results = []
+            for row in response['data']:
+                obj = {}
+                for idx, col in enumerate(response['columns']):
+                    obj[col] = row[idx]
+                results.append(obj)
+            return results
+        
+        def find_connections(self, account_id, limit=50):
+            """Find all direct connections for an account"""
+            query = """
+            MATCH (a:Account {id: $id})-[r]-(b:Account)
+            RETURN a.id as source, type(r) as relationship, b.id as target
+            LIMIT $limit
+            """
+            response = self.execute_query(query, {'id': account_id, 'limit': limit})
+            return self.parse_results(response)
+        
+        def trace_fund_flow(self, source_account, max_depth=5, limit=20):
+            """Trace outgoing fund flows from an account"""
+            query = f"""
+            MATCH path = (src:Account {{id: $id}})-[:SENT*1..{max_depth}]->(dest:Account)
+            RETURN path
+            LIMIT {limit}
+            """
+            response = self.execute_query(query, {'id': source_account})
+            # For path queries, return raw data
+            return response.get('data', [])
+        
+        def find_shortest_path(self, from_account, to_account, max_hops=10):
+            """Find shortest path between two accounts"""
+            query = f"""
+            MATCH path = shortestPath(
+                (a:Account {{id: $from}})-[*..{max_hops}]-(b:Account {{id: $to}})
+            )
+            RETURN path
+            """
+            response = self.execute_query(query, {'from': from_account, 'to': to_account})
+            return response.get('data', [])
+        
+        def find_high_value_transfers(self, min_amount, limit=100):
+            """Find high-value transfer patterns"""
+            query = """
+            MATCH (a:Account)-[t:SENT]->(b:Account)
+            WHERE t.amount >= $min_amount
+            RETURN a.id as sender, b.id as receiver, t.amount as amount
+            ORDER BY t.amount DESC
+            LIMIT $limit
+            """
+            response = self.execute_query(query, {'min_amount': min_amount, 'limit': limit})
+            return self.parse_results(response)
+        
+        def analyze_account_network(self, account_id, depth=2):
+            """Analyze network around an account"""
+            query = f"""
+            MATCH path = (center:Account {{id: $id}})-[*1..{depth}]-(other:Account)
+            WITH center, other, length(path) as distance
+            RETURN center.id as center, 
+                   other.id as connected_account, 
+                   distance
+            ORDER BY distance, other.id
+            LIMIT 200
+            """
+            response = self.execute_query(query, {'id': account_id})
+            return self.parse_results(response)
+
+    # Usage
+    api = GraphQueryAPI('YOUR_KEY')
+    
+    # Find connections
+    connections = api.find_connections('example.near')
+    print(f"Found {len(connections)} connections")
+    for conn in connections:
+        print(f"{conn['source']} --[{conn['relationship']}]--> {conn['target']}")
+    
+    # Trace fund flow
+    flow = api.trace_fund_flow('suspicious.near', max_depth=3)
+    print(f"Found {len(flow)} fund flow paths")
+    
+    # Find shortest path
+    path = api.find_shortest_path('sender.near', 'receiver.near')
+    if path:
+        print("Path found between accounts")
+    else:
+        print("No path exists")
+    
+    # High-value transfers
+    high_value = api.find_high_value_transfers(min_amount=10000)
+    for transfer in high_value:
+        print(f"{transfer['sender']} -> {transfer['receiver']}: {transfer['amount']} NEAR")
+    ```
+  </Tab>
+  
+  <Tab title="Go">
+    ```go
+    package main
+
+    import (
+        "bytes"
+        "encoding/json"
+        "fmt"
+        "net/http"
+    )
+
+    type GraphQueryClient struct {
+        BaseURL string
+        APIKey  string
+        Client  *http.Client
+    }
+
+    type GraphQuery struct {
+        Query  string                 `json:"query"`
+        Params map[string]interface{} `json:"params,omitempty"`
+    }
+
+    type GraphResponse struct {
+        Results []map[string]interface{} `json:"results"`
+        Error   string                   `json:"error,omitempty"`
+    }
+
+    func NewGraphQueryClient(apiKey string) *GraphQueryClient {
+        return &GraphQueryClient{
+            BaseURL: "https://api.shadowcorp.dev",
+            APIKey:  apiKey,
+            Client:  &http.Client{},
+        }
+    }
+
+    func (c *GraphQueryClient) ExecuteQuery(query string, params map[string]interface{}) (*GraphResponse, error) {
+        graphQuery := GraphQuery{
+            Query:  query,
+            Params: params,
+        }
+        
+        jsonData, err := json.Marshal(graphQuery)
+        if err != nil {
+            return nil, err
+        }
+        
+        req, err := http.NewRequest("POST", c.BaseURL+"/v1/graph", bytes.NewBuffer(jsonData))
+        if err != nil {
+            return nil, err
+        }
+        
+        req.Header.Set("Content-Type", "application/json")
+        req.Header.Set("X-API-Key", c.APIKey)
+        
+        resp, err := c.Client.Do(req)
+        if err != nil {
+            return nil, err
+        }
+        defer resp.Body.Close()
+
+        var graphResp GraphResponse
+        if err := json.NewDecoder(resp.Body).Decode(&graphResp); err != nil {
+            return nil, err
+        }
+        
+        return &graphResp, nil
+    }
+
+    func (c *GraphQueryClient) FindConnections(accountID string, limit int) (*GraphResponse, error) {
+        query := `
+            MATCH (a:Account {id: $id})-[r]-(b:Account)
+            RETURN a.id as source, type(r) as relationship, b.id as target
+            LIMIT $limit
+        `
+        params := map[string]interface{}{
+            "id":    accountID,
+            "limit": limit,
+        }
+        return c.ExecuteQuery(query, params)
+    }
+
+    func (c *GraphQueryClient) TraceFundFlow(sourceAccount string, maxDepth, limit int) (*GraphResponse, error) {
+        query := fmt.Sprintf(`
+            MATCH path = (src:Account {id: $id})-[:SENT*1..%d]->(dest:Account)
+            RETURN path
+            LIMIT %d
+        `, maxDepth, limit)
+        
+        params := map[string]interface{}{
+            "id": sourceAccount,
+        }
+        return c.ExecuteQuery(query, params)
+    }
+
+    func (c *GraphQueryClient) FindShortestPath(fromAccount, toAccount string, maxHops int) (*GraphResponse, error) {
+        query := fmt.Sprintf(`
+            MATCH path = shortestPath(
+                (a:Account {id: $from})-[*..%d]-(b:Account {id: $to})
+            )
+            RETURN path
+        `, maxHops)
+        
+        params := map[string]interface{}{
+            "from": fromAccount,
+            "to":   toAccount,
+        }
+        return c.ExecuteQuery(query, params)
+    }
+
+    func main() {
+        client := NewGraphQueryClient("YOUR_KEY")
+        
+        // Find connections
+        connections, err := client.FindConnections("example.near", 50)
+        if err != nil {
+            panic(err)
+        }
+        
+        fmt.Printf("Found %d connections\n", len(connections.Results))
+        for _, result := range connections.Results {
+            fmt.Printf("%v --[%v]--> %v\n", 
+                result["source"], 
+                result["relationship"], 
+                result["target"])
+        }
+        
+        // Trace fund flow
+        flow, err := client.TraceFundFlow("suspicious.near", 3, 20)
+        if err != nil {
+            panic(err)
+        }
+        fmt.Printf("Found %d fund flow paths\n", len(flow.Results))
+        
+        // Find shortest path
+        path, err := client.FindShortestPath("sender.near", "receiver.near", 10)
+        if err != nil {
+            panic(err)
+        }
+        if len(path.Results) > 0 {
+            fmt.Println("Path found between accounts")
+        } else {
+            fmt.Println("No path found")
+        }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Response Format
+
+The API returns results in Neo4j's standard format:
+
+<ResponseField name="columns" type="array" required>
+  Array of column names corresponding to the values in your RETURN clause.
+</ResponseField>
+
+<ResponseField name="data" type="array" required>
+  Array of result rows. Each row contains values in the same order as the columns array.
+</ResponseField>
+
+<ResponseField name="error" type="string">
+  Error message if the query failed. Only present when an error occurs.
+</ResponseField>
+
+<Note>
+  Results are returned as arrays of values, not key-value pairs. Use the `columns` array to map values to their names.
+</Note>
+
+### Success Response (200 OK)
+
+**Simple relationship query:**
+```json
+{
+  "columns": ["source", "relationship", "target"],
+  "data": [
+    ["example.near", "SENT", "receiver.near"],
+    ["example.near", "RECEIVED", "sender.near"]
+  ]
+}
+```
+
+**Aggregation query:**
+```json
+{
+  "columns": ["recipient", "transfer_count", "total_amount"],
+  "data": [
+    ["receiver1.near", 15, 5000.5],
+    ["receiver2.near", 8, 3200.0],
+    ["receiver3.near", 3, 1500.25]
+  ]
+}
+```
+
+**Path query:**
+```json
+{
+  "columns": ["path"],
+  "data": [
+    [{
+      "nodes": [
+        {"id": "sender.near", "labels": ["Account"]},
+        {"id": "intermediary.near", "labels": ["Account"]},
+        {"id": "receiver.near", "labels": ["Account"]}
+      ],
+      "relationships": [
+        {"type": "SENT", "properties": {"amount": 1000}},
+        {"type": "SENT", "properties": {"amount": 500}}
+      ]
+    }]
+  ]
+}
+```
+
+**Empty results:**
+```json
+{
+  "columns": ["path"],
+  "data": []
+}
+```
+
+<Check>
+  A `200 OK` status code indicates the query executed successfully. Empty `data` arrays are valid and indicate no matches were found.
+</Check>
+
+## Graph Schema
+
+<AccordionGroup>
+  <Accordion title="Node Types" icon="circle-nodes">
+    The graph database contains the following node types:
+    
+    ### Account
+    Represents a NEAR account (user, contract, or validator).
+    
+    **Properties:**
+    - `id` (string) - Account ID (e.g., "example.near")
+    - `created_at` (timestamp) - Account creation time
+    - `labels` (array) - Classification labels (e.g., "Exchange", "DeFi")
+    - `risk_score` (float) - Risk assessment score (0-100)
+    
+    ### Transaction
+    Represents a blockchain transaction.
+    
+    **Properties:**
+    - `hash` (string) - Transaction hash
+    - `block_height` (integer) - Block number
+    - `timestamp` (timestamp) - Transaction time
+    - `status` (string) - Success or failure status
+    
+    ### Block
+    Represents a blockchain block.
+    
+    **Properties:**
+    - `height` (integer) - Block number
+    - `hash` (string) - Block hash
+    - `timestamp` (timestamp) - Block time
+    - `author` (string) - Validator that produced the block
+  </Accordion>
+  
+  <Accordion title="Relationship Types" icon="arrows-split-up-and-left">
+    Relationships connect nodes in the graph:
+    
+    ### SENT
+    Transfer of assets from one account to another.
+    
+    **Properties:**
+    - `amount` (float) - Transfer amount
+    - `currency` (string) - Token type ("NEAR" or contract ID)
+    - `timestamp` (timestamp) - Transfer time
+    - `tx_hash` (string) - Associated transaction
+    
+    ### RECEIVED
+    Inverse of SENT (for convenience in queries).
+    
+    ### STAKED
+    Account stakes tokens with a validator pool.
+    
+    **Properties:**
+    - `amount` (float) - Staked amount
+    - `timestamp` (timestamp) - Staking time
+    
+    ### CALLED
+    Account calls a smart contract method.
+    
+    **Properties:**
+    - `method` (string) - Contract method name
+    - `timestamp` (timestamp) - Call time
+    - `tx_hash` (string) - Associated transaction
+    
+    ### VALIDATED
+    Validator produced a block.
+    
+    **Properties:**
+    - `block_height` (integer) - Block number
+    - `timestamp` (timestamp) - Block time
+  </Accordion>
+  
+  <Accordion title="Query Patterns" icon="code">
+    Common Cypher patterns for blockchain analysis:
+    
+    ### Direct relationships
+    ```cypher
+    MATCH (a:Account {id: $id})-[r]->(b:Account)
+    RETURN a, r, b
+    ```
+    
+    ### Variable-length paths
+    ```cypher
+    MATCH path = (a:Account)-[:SENT*1..5]->(b:Account)
+    WHERE a.id = $id
+    RETURN path
+    ```
+    
+    ### Aggregation
+    ```cypher
+    MATCH (a:Account {id: $id})-[s:SENT]->(b:Account)
+    RETURN b.id as recipient, 
+           count(s) as transfer_count,
+           sum(s.amount) as total_amount
+    ORDER BY total_amount DESC
+    ```
+    
+    ### Filtering
+    ```cypher
+    MATCH (a:Account)-[s:SENT]->(b:Account)
+    WHERE s.amount > $min_amount 
+      AND s.timestamp > $start_time
+    RETURN a.id, b.id, s.amount
+    ```
+  </Accordion>
+  
+  <Accordion title="Performance Tips" icon="gauge-high">
+    Optimize your queries for better performance:
+    
+    ### Use parameters
+    ```cypher
+    // Good - uses parameters
+    MATCH (a:Account {id: $id})
+    
+    // Bad - hardcoded values
+    MATCH (a:Account {id: "example.near"})
+    ```
+    
+    ### Limit depth in path queries
+    ```cypher
+    // Good - limited depth
+    MATCH path = (a)-[*1..5]->(b)
+    
+    // Bad - unlimited depth (can be very slow)
+    MATCH path = (a)-[*]->(b)
+    ```
+    
+    ### Always use LIMIT
+    ```cypher
+    // Good - prevents huge result sets
+    MATCH (a:Account)-[r]->(b)
+    RETURN a, r, b
+    LIMIT 100
+    
+    // Bad - could return millions of results
+    MATCH (a:Account)-[r]->(b)
+    RETURN a, r, b
+    ```
+    
+    ### Index on commonly queried properties
+    The database has indexes on:
+    - `Account.id`
+    - `Transaction.hash`
+    - `Block.height`
+    
+    Always filter on these properties when possible.
+  </Accordion>
+</AccordionGroup>
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Forensic Analysis" icon="magnifying-glass-chart" color="#3b82f6">
+    Trace suspicious activity and money laundering patterns through multi-hop transfers.
+  </Card>
+  
+  <Card title="Network Analysis" icon="diagram-project" color="#8b5cf6">
+    Discover communities, influential nodes, and network topology in the NEAR ecosystem.
+  </Card>
+  
+  <Card title="Compliance Monitoring" icon="shield-check" color="#10b981">
+    Identify connections to sanctioned addresses and high-risk entities.
+  </Card>
+  
+  <Card title="Fund Flow Tracking" icon="arrow-trend-up" color="#f59e0b">
+    Follow the movement of stolen funds or track investment flows across accounts.
+  </Card>
+</CardGroup>
+
+## Advanced Example: Forensic Analysis Tool
+
+Here's a complete example of a forensic analysis tool using graph queries:
+
+```javascript
+class ForensicAnalyzer {
+  constructor(apiKey) {
+    this.apiKey = apiKey;
+    this.baseUrl = 'https://api.shadowcorp.dev';
+  }
+
+  async executeQuery(query, params = {}) {
+    const response = await fetch(`${this.baseUrl}/v1/graph`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-Key': this.apiKey
+      },
+      body: JSON.stringify({ query, params })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Query failed: ${response.statusText}`);
+    }
+
+    return await response.json();
+  }
+
+  parseResults(response) {
+    if (!response.data || response.data.length === 0) {
+      return [];
+    }
+    
+    return response.data.map(row => {
+      const obj = {};
+      response.columns.forEach((col, idx) => {
+        obj[col] = row[idx];
+      });
+      return obj;
+    });
+  }
+
+  async analyzeAccount(accountId) {
+    console.log(`\n🔍 Analyzing account: ${accountId}\n`);
+    
+    // Get direct connections
+    const connectionsResp = await this.executeQuery(
+      `MATCH (a:Account {id: $id})-[r]-(b:Account)
+       RETURN type(r) as relationship, 
+              count(b) as count,
+              collect(distinct b.id)[0..5] as sample_accounts
+       ORDER BY count DESC`,
+      { id: accountId }
+    );
+
+    const connections = this.parseResults(connectionsResp);
+
+    console.log('Direct Connections:');
+    connections.forEach(rel => {
+      console.log(`  ${rel.relationship}: ${rel.count} connections`);
+      console.log(`    Sample: ${rel.sample_accounts.join(', ')}`);
+    });
+
+    // Calculate centrality
+    const centralityResp = await this.executeQuery(
+      `MATCH (a:Account {id: $id})-[r]-(b:Account)
+       WITH a, count(distinct b) as degree
+       RETURN degree`,
+      { id: accountId }
+    );
+
+    const centrality = this.parseResults(centralityResp);
+    if (centrality.length > 0) {
+      console.log(`\nNetwork Degree: ${centrality[0].degree}`);
+    }
+
+    // Find high-value transfers
+    const highValueResp = await this.executeQuery(
+      `MATCH (a:Account {id: $id})-[s:SENT]->(b:Account)
+       WHERE s.amount > 1000
+       RETURN b.id as recipient, 
+              s.amount as amount,
+              s.timestamp as time
+       ORDER BY s.amount DESC
+       LIMIT 10`,
+      { id: accountId }
+    );
+
+    const highValue = this.parseResults(highValueResp);
+
+    console.log('\nTop Outgoing Transfers:');
+    highValue.forEach(tx => {
+      console.log(`  ${tx.recipient}: ${tx.amount} NEAR`);
+    });
+  }
+
+  async traceFunds(sourceAccount, targetAccount, maxHops = 10) {
+    console.log(`\n🎯 Tracing path from ${sourceAccount} to ${targetAccount}\n`);
+    
+    const result = await this.executeQuery(
+      `MATCH path = shortestPath(
+         (source:Account {id: $source})-[:SENT*1..${maxHops}]->
+         (target:Account {id: $target})
+       )
+       RETURN [node in nodes(path) | node.id] as accounts,
+              [rel in relationships(path) | rel.amount] as amounts,
+              length(path) as hops`,
+      { source: sourceAccount, target: targetAccount }
+    );
+
+    const paths = this.parseResults(result);
+
+    if (paths.length === 0) {
+      console.log('❌ No path found between accounts');
+      return null;
+    }
+
+    const path = paths[0];
+    console.log(`✅ Found path in ${path.hops} hops:\n`);
+    
+    for (let i = 0; i < path.accounts.length - 1; i++) {
+      console.log(`  ${path.accounts[i]}`);
+      console.log(`    ↓ ${path.amounts[i]} NEAR`);
+    }
+    console.log(`  ${path.accounts[path.accounts.length - 1]}`);
+
+    return path;
+  }
+
+  async findSuspiciousPatterns(accountId) {
+    console.log(`\n⚠️  Checking for suspicious patterns: ${accountId}\n`);
+    
+    // Check for rapid distribution (potential money laundering)
+    const distributionResp = await this.executeQuery(
+      `MATCH (source:Account {id: $id})-[s1:SENT]->(mid:Account)
+             -[s2:SENT]->(final:Account)
+       WHERE s2.timestamp - s1.timestamp < 3600
+         AND s1.amount > 5000
+       RETURN mid.id as intermediary,
+              final.id as final_recipient,
+              s1.amount as initial_amount,
+              s2.amount as final_amount,
+              s2.timestamp - s1.timestamp as time_diff
+       LIMIT 10`,
+      { id: accountId }
+    );
+
+    const distribution = this.parseResults(distributionResp);
+
+    if (distribution.length > 0) {
+      console.log('🚨 Rapid fund distribution detected:');
+      distribution.forEach(pattern => {
+        console.log(`  ${accountId} → ${pattern.intermediary} → ${pattern.final_recipient}`);
+        console.log(`    ${pattern.initial_amount} NEAR in ${pattern.time_diff}s`);
+      });
+    } else {
+      console.log('✅ No rapid distribution patterns found');
+    }
+
+    // Check for circular transfers
+    const circularResp = await this.executeQuery(
+      `MATCH path = (a:Account {id: $id})-[:SENT*2..5]->(a)
+       RETURN [node in nodes(path) | node.id] as cycle,
+              length(path) as length
+       LIMIT 5`,
+      { id: accountId }
+    );
+
+    const circular = this.parseResults(circularResp);
+
+    if (circular.length > 0) {
+      console.log('\n🚨 Circular transfer patterns detected:');
+      circular.forEach(cycle => {
+        console.log(`  Cycle (${cycle.length} hops): ${cycle.cycle.join(' → ')}`);
+      });
+    } else {
+      console.log('\n✅ No circular transfer patterns found');
+    }
+  }
+
+  async findCommonCounterparties(account1, account2) {
+    console.log(`\n🔗 Finding common counterparties...\n`);
+    
+    const result = await this.executeQuery(
+      `MATCH (a1:Account {id: $id1})-[r1]-(common:Account)-[r2]-(a2:Account {id: $id2})
+       WHERE a1 <> a2 AND a1 <> common AND a2 <> common
+       RETURN common.id as account,
+              count(distinct r1) + count(distinct r2) as connection_strength,
+              collect(distinct type(r1))[0..3] as relationship_types
+       ORDER BY connection_strength DESC
+       LIMIT 10`,
+      { id1: account1, id2: account2 }
+    );
+
+    const commonCounterparties = this.parseResults(result);
+
+    if (commonCounterparties.length === 0) {
+      console.log('No common counterparties found');
+      return;
+    }
+
+    console.log('Common Counterparties:');
+    commonCounterparties.forEach(common => {
+      console.log(`  ${common.account}`);
+      console.log(`    Strength: ${common.connection_strength}`);
+      console.log(`    Types: ${common.relationship_types.join(', ')}`);
+    });
+  }
+
+  async generateReport(accountId) {
+    console.log('═'.repeat(60));
+    console.log(`FORENSIC ANALYSIS REPORT: ${accountId}`);
+    console.log('═'.repeat(60));
+
+    await this.analyzeAccount(accountId);
+    await this.findSuspiciousPatterns(accountId);
+
+    console.log('\n' + '═'.repeat(60));
+  }
+}
+
+// Usage Examples
+const analyzer = new ForensicAnalyzer('YOUR_KEY');
+
+// Full analysis report
+await analyzer.generateReport('suspicious.near');
+
+// Trace funds between accounts
+await analyzer.traceFunds('sender.near', 'receiver.near', 10);
+
+// Find common connections
+await analyzer.findCommonCounterparties('account1.near', 'account2.near');
+
+// Check specific patterns
+await analyzer.findSuspiciousPatterns('questionable.near');
+```
+
+## Common Cypher Queries
+
+<AccordionGroup>
+  <Accordion title="Account Analysis" icon="user">
+    ```cypher
+    // Get all relationships for an account
+    MATCH (a:Account {id: $id})-[r]-(b:Account)
+    RETURN a, r, b
+    LIMIT 100
+
+    // Find most frequent counterparties
+    MATCH (a:Account {id: $id})-[r]-(b:Account)
+    RETURN b.id as counterparty,
+           count(r) as interaction_count,
+           collect(distinct type(r)) as relationship_types
+    ORDER BY interaction_count DESC
+    LIMIT 20
+
+    // Calculate network centrality
+    MATCH (a:Account {id: $id})-[]-(b:Account)
+    WITH a, count(distinct b) as degree
+    RETURN a.id, degree
+    ```
+  </Accordion>
+  
+  <Accordion title="Fund Flow Tracking" icon="money-bill-transfer">
+    ```cypher
+    // Trace outgoing fund flows
+    MATCH path = (source:Account {id: $id})-[:SENT*1..5]->(dest:Account)
+    RETURN path
+    LIMIT 20
+
+    // Find paths above threshold
+    MATCH path = (a:Account {id: $id})-[s:SENT*1..5]->(b:Account)
+    WHERE all(r in s WHERE r.amount > $min_amount)
+    RETURN path
+    LIMIT 10
+
+    // Shortest path between accounts
+    MATCH path = shortestPath(
+      (a:Account {id: $from})-[:SENT*1..10]->(b:Account {id: $to})
+    )
+    RETURN path
+
+    // All paths with length constraint
+    MATCH path = (a:Account {id: $from})-[:SENT*3..5]->(b:Account {id: $to})
+    RETURN path
+    LIMIT 10
+    ```
+  </Accordion>
+  
+  <Accordion title="Pattern Detection" icon="magnifying-glass">
+    ```cypher
+    // Circular transfers (potential wash trading)
+    MATCH path = (a:Account {id: $id})-[:SENT*2..5]->(a)
+    RETURN path
+    LIMIT 10
+
+    // Rapid sequential transfers
+    MATCH (a:Account {id: $id})-[s1:SENT]->(b:Account)-[s2:SENT]->(c:Account)
+    WHERE s2.timestamp - s1.timestamp < 3600
+      AND s1.amount > $min_amount
+    RETURN a.id, b.id, c.id, s1.amount, s2.amount
+    LIMIT 20
+
+    // Fan-out pattern (distribution)
+    MATCH (center:Account {id: $id})-[s:SENT]->(recipient:Account)
+    WHERE s.timestamp > $start_time
+    RETURN center.id, 
+           count(distinct recipient) as recipient_count,
+           sum(s.amount) as total_amount
+    ```
+  </Accordion>
+  
+  <Accordion title="Network Analysis" icon="network-wired">
+    ```cypher
+    // Find communities (accounts that interact frequently)
+    MATCH (a:Account)-[r]-(b:Account)
+    WHERE a.id IN [$id1, $id2, $id3]
+       OR b.id IN [$id1, $id2, $id3]
+    RETURN a, r, b
+
+    // Identify hubs (highly connected accounts)
+    MATCH (a:Account)-[r]-(b:Account)
+    WITH a, count(distinct b) as connections
+    WHERE connections > $min_connections
+    RETURN a.id, connections
+    ORDER BY connections DESC
+    LIMIT 20
+
+    // Find bridge accounts (connect different clusters)
+    MATCH (a:Account)-[]-(bridge:Account)-[]-(b:Account)
+    WHERE a.id = $id1 AND b.id = $id2
+      AND NOT (a)-[]-(b)
+    RETURN distinct bridge.id
+    LIMIT 10
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Error Responses
+
+### 400 Bad Request
+
+```json
+{
+  "error": "Invalid Cypher query syntax",
+  "code": 400
+}
+```
+
+<Warning>
+  Ensure your query follows proper Cypher syntax. Common issues include missing parentheses, incorrect relationship syntax, or invalid operators.
+</Warning>
+
+### 401 Unauthorized
+
+```json
+{
+  "error": "Missing or invalid API key",
+  "code": 401
+}
+```
+
+### 403 Forbidden
+
+```json
+{
+  "error": "Write operations are not permitted. Query contains: CREATE",
+  "code": 403
+}
+```
+
+<Note>
+  Only read-only queries are allowed. Destructive operations (CREATE, DELETE, SET, MERGE, REMOVE) are blocked for data integrity.
+</Note>
+
+### 500 Internal Server Error
+
+```json
+{
+  "error": "Query execution failed: Memory limit exceeded",
+  "code": 500
+}
+```
+
+## Query Optimization Guide
+
+<AccordionGroup>
+  <Accordion title="Limit Result Sets" icon="filter">
+    Always include LIMIT clauses to prevent overwhelming response sizes:
+    
+    ```cypher
+    // Good
+    MATCH (a:Account)-[r]->(b:Account)
+    RETURN a, r, b
+    LIMIT 100
+
+    // Bad - could return millions of results
+    MATCH (a:Account)-[r]->(b:Account)
+    RETURN a, r, b
+    ```
+  </Accordion>
+  
+  <Accordion title="Constrain Path Length" icon="route">
+    Always specify maximum path length in variable-length patterns:
+    
+    ```cypher
+    // Good - limited depth
+    MATCH path = (a)-[:SENT*1..5]->(b)
+    RETURN path
+
+    // Bad - unlimited depth
+    MATCH path = (a)-[:SENT*]->(b)
+    RETURN path
+    ```
+    
+    Recommended maximums:
+    - General queries: 5 hops
+    - Shortest path: 10 hops
+    - Deep analysis: 15 hops (use sparingly)
+  </Accordion>
+  
+  <Accordion title="Use Parameters" icon="sliders">
+    Parameters improve performance and prevent injection:
+    
+    ```cypher
+    // Good - parameterized
+    MATCH (a:Account {id: $id})
+    WHERE a.risk_score > $min_score
+    RETURN a
+
+    // Bad - hardcoded
+    MATCH (a:Account {id: "example.near"})
+    WHERE a.risk_score > 50
+    RETURN a
+    ```
+  </Accordion>
+  
+  <Accordion title="Filter Early" icon="funnel">
+    Apply filters as early as possible in the query:
+    
+    ```cypher
+    // Good - filter at start
+    MATCH (a:Account {id: $id})-[s:SENT]->(b:Account)
+    WHERE s.amount > 1000
+    RETURN b
+
+    // Less efficient - filter after match
+    MATCH (a:Account)-[s:SENT]->(b:Account)
+    WHERE a.id = $id AND s.amount > 1000
+    RETURN b
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+  <Card 
+    title="Account Data" 
+    icon="user-circle" 
+    href="/shadow-api/endpoints/full-account-data"
+  >
+    Get detailed account information before graph analysis
+  </Card>
+  
+  <Card 
+    title="Transactions" 
+    icon="swap" 
+    href="/shadow-api/endpoints/transactions"
+  >
+    View transaction details for specific transfers
+  </Card>
+  
+  <Card 
+    title="Alerts" 
+    icon="triangle-exclamation" 
+    href="/shadow-api/endpoints/anomaly-alerts"
+  >
+    Check anomaly alerts for suspicious accounts
+  </Card>
+  
+  <Card 
+    title="Transfers" 
+    icon="coins" 
+    href="/shadow-api/endpoints/transfers"
+  >
+    List FT/NFT transfers for accounts
+  </Card>
+</CardGroup>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Start Simple" icon="seedling">
+    Begin with simple queries and gradually increase complexity:
+    
+    ```javascript
+    // Step 1: Check if account exists
+    const exists = await executeQuery(
+      'MATCH (a:Account {id: $id}) RETURN a',
+      { id: accountId }
+    );
+
+    // Step 2: Get direct connections
+    const connections = await executeQuery(
+      'MATCH (a:Account {id: $id})-[r]-(b) RETURN type(r), count(b)',
+      { id: accountId }
+    );
+
+    // Step 3: Explore specific relationships
+    const sent = await executeQuery(
+      'MATCH (a:Account {id: $id})-[s:SENT]->(b) RETURN b.id, s.amount',
+      { id: accountId }
+    );
+    ```
+  </Accordion>
+  
+  <Accordion title="Handle Empty Results" icon="inbox">
+    Always check for empty result sets:
+    
+    ```javascript
+    const result = await executeQuery(query, params);
+    
+    if (!result.data || result.data.length === 0) {
+      console.log('No results found');
+      return null;
+    }
+    
+    // Convert to objects for easier handling
+    const parsed = result.data.map(row => {
+      const obj = {};
+      result.columns.forEach((col, idx) => {
+        obj[col] = row[idx];
+      });
+      return obj;
+    });
+    
+    // Process results
+    parsed.forEach(row => {
+      console.log(row);
+    });
+    ```
+  </Accordion>
+  
+  <Accordion title="Use Appropriate Timeouts" icon="clock">
+    Complex graph queries can take time. Set appropriate timeouts:
+    
+    ```javascript
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+    
+    try {
+      const response = await fetch(url, {
+        signal: controller.signal,
+        // ... other options
+      });
+      clearTimeout(timeoutId);
+      return await response.json();
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        console.log('Query timed out after 30 seconds');
+      }
+      throw error;
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Visualize Results" icon="chart-network">
+    Graph data is best understood visually. Consider using visualization libraries:
+    
+    ```javascript
+    import { Network } from 'vis-network';
+    
+    function visualizeGraph(graphData) {
+      const nodes = graphData.results
+        .flatMap(r => [r.source, r.target])
+        .filter((v, i, a) => a.indexOf(v) === i)
+        .map(id => ({ id, label: id }));
+      
+      const edges = graphData.results.map((r, i) => ({
+        id: i,
+        from: r.source,
+        to: r.target,
+        label: r.relationship
+      }));
+      
+      const container = document.getElementById('graph');
+      new Network(container, { nodes, edges }, options);
+    }
+    ```
+  </Accordion>
+</AccordionGroup>

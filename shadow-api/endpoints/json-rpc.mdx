@@ -1,0 +1,1676 @@
+---
+title: JSON-RPC
+description: Full NEAR Protocol JSON-RPC 2.0 access through authenticated proxy. Execute any NEAR RPC method with enhanced security, rate limiting, and batch request support.
+icon: code
+---
+
+import { Endpoint, Request } from '@mintlify/components';
+
+## RPC Proxy Endpoint
+
+<Endpoint method="POST" path="/v1/rpc" />
+
+Direct access to NEAR Protocol's JSON-RPC 2.0 interface through ShadowCorp's authenticated proxy. Execute any standard NEAR RPC method including account queries, contract calls, block data retrieval, and transaction status checks.
+
+<Info>
+  This endpoint provides full NEAR RPC functionality with added security, authentication, and rate limiting. All standard NEAR Protocol RPC methods are supported.
+</Info>
+
+## Batch RPC Endpoint
+
+<Endpoint method="POST" path="/v1/rpc/batch" />
+
+Execute multiple RPC requests in a single HTTP call for improved efficiency. Batch requests are processed in parallel and return results in the same order as requested.
+
+<Tip>
+  Use batch requests when you need to fetch multiple pieces of data simultaneously. This reduces latency and improves application performance.
+</Tip>
+
+### Request Format
+
+Both endpoints accept standard JSON-RPC 2.0 format:
+
+<ParamField body="jsonrpc" type="string" required>
+  JSON-RPC protocol version. Must be `"2.0"`.
+</ParamField>
+
+<ParamField body="id" type="string | number" required>
+  Request identifier. Can be any string or number. The response will include the same ID.
+</ParamField>
+
+<ParamField body="method" type="string" required>
+  The NEAR RPC method to call (e.g., `"status"`, `"query"`, `"block"`).
+</ParamField>
+
+<ParamField body="params" type="object | array">
+  Method-specific parameters. Can be an object or array depending on the method.
+</ParamField>
+
+### Making Requests
+
+<Tabs>
+  <Tab title="cURL">
+    **Network status:**
+    ```bash
+    curl -X POST https://api.shadowcorp.dev/v1/rpc \
+      -H "Content-Type: application/json" \
+      -H "X-API-Key: YOUR_KEY" \
+      -d '{
+        "jsonrpc": "2.0",
+        "id": "1",
+        "method": "status",
+        "params": []
+      }'
+    ```
+
+    **View account:**
+    ```bash
+    curl -X POST https://api.shadowcorp.dev/v1/rpc \
+      -H "Content-Type: application/json" \
+      -H "X-API-Key: YOUR_KEY" \
+      -d '{
+        "jsonrpc": "2.0",
+        "id": "1",
+        "method": "query",
+        "params": {
+          "request_type": "view_account",
+          "finality": "final",
+          "account_id": "example.near"
+        }
+      }'
+    ```
+
+    **Call contract method:**
+    ```bash
+    curl -X POST https://api.shadowcorp.dev/v1/rpc \
+      -H "Content-Type: application/json" \
+      -H "X-API-Key: YOUR_KEY" \
+      -d '{
+        "jsonrpc": "2.0",
+        "id": "1",
+        "method": "query",
+        "params": {
+          "request_type": "call_function",
+          "finality": "final",
+          "account_id": "wrap.near",
+          "method_name": "ft_metadata",
+          "args_base64": "e30="
+        }
+      }'
+    ```
+
+    **Batch request:**
+    ```bash
+    curl -X POST https://api.shadowcorp.dev/v1/rpc/batch \
+      -H "Content-Type: application/json" \
+      -H "X-API-Key: YOUR_KEY" \
+      -d '[
+        {
+          "jsonrpc": "2.0",
+          "id": "1",
+          "method": "status",
+          "params": []
+        },
+        {
+          "jsonrpc": "2.0",
+          "id": "2",
+          "method": "query",
+          "params": {
+            "request_type": "view_account",
+            "finality": "final",
+            "account_id": "near"
+          }
+        }
+      ]'
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    class NearRPCClient {
+      constructor(apiKey) {
+        this.apiKey = apiKey;
+        this.baseUrl = 'https://api.shadowcorp.dev';
+      }
+
+      async call(method, params = []) {
+        const response = await fetch(`${this.baseUrl}/v1/rpc`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-API-Key': this.apiKey
+          },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: Date.now().toString(),
+            method,
+            params
+          })
+        });
+
+        const data = await response.json();
+        
+        if (data.error) {
+          throw new Error(data.error.message || 'RPC call failed');
+        }
+
+        return data.result;
+      }
+
+      async batchCall(requests) {
+        const response = await fetch(`${this.baseUrl}/v1/rpc/batch`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-API-Key': this.apiKey
+          },
+          body: JSON.stringify(
+            requests.map((req, index) => ({
+              jsonrpc: '2.0',
+              id: index.toString(),
+              method: req.method,
+              params: req.params || []
+            }))
+          )
+        });
+
+        return await response.json();
+      }
+
+      // Convenience methods
+      async getStatus() {
+        return await this.call('status', []);
+      }
+
+      async getBlock(blockId) {
+        return await this.call('block', { block_id: blockId });
+      }
+
+      async viewAccount(accountId) {
+        return await this.call('query', {
+          request_type: 'view_account',
+          finality: 'final',
+          account_id: accountId
+        });
+      }
+
+      async callFunction(contractId, methodName, args = {}) {
+        const argsBase64 = Buffer.from(JSON.stringify(args)).toString('base64');
+        
+        return await this.call('query', {
+          request_type: 'call_function',
+          finality: 'final',
+          account_id: contractId,
+          method_name: methodName,
+          args_base64: argsBase64
+        });
+      }
+
+      async getTxStatus(txHash, senderId) {
+        return await this.call('tx', [txHash, senderId]);
+      }
+    }
+
+    // Usage
+    const client = new NearRPCClient('YOUR_KEY');
+
+    // Get network status
+    const status = await client.getStatus();
+    console.log('Chain ID:', status.chain_id);
+    console.log('Latest block:', status.sync_info.latest_block_height);
+
+    // View account
+    const account = await client.viewAccount('example.near');
+    console.log('Balance:', account.amount);
+
+    // Call contract
+    const metadata = await client.callFunction(
+      'wrap.near',
+      'ft_metadata',
+      {}
+    );
+    console.log('Token:', metadata);
+
+    // Batch request
+    const results = await client.batchCall([
+      { method: 'status' },
+      { 
+        method: 'query',
+        params: {
+          request_type: 'view_account',
+          finality: 'final',
+          account_id: 'near'
+        }
+      }
+    ]);
+    console.log('Batch results:', results);
+    ```
+  </Tab>
+  
+  <Tab title="Python">
+    ```python
+    import requests
+    import json
+    import base64
+    from typing import Any, Dict, List, Optional
+
+    class NearRPCClient:
+        def __init__(self, api_key: str):
+            self.api_key = api_key
+            self.base_url = 'https://api.shadowcorp.dev'
+            self.headers = {
+                'Content-Type': 'application/json',
+                'X-API-Key': api_key
+            }
+        
+        def call(self, method: str, params: Any = None) -> Dict:
+            """Make a single RPC call"""
+            if params is None:
+                params = []
+            
+            payload = {
+                'jsonrpc': '2.0',
+                'id': '1',
+                'method': method,
+                'params': params
+            }
+            
+            response = requests.post(
+                f'{self.base_url}/v1/rpc',
+                headers=self.headers,
+                json=payload
+            )
+            
+            data = response.json()
+            
+            if 'error' in data:
+                raise Exception(f"RPC Error: {data['error']}")
+            
+            return data.get('result')
+        
+        def batch_call(self, requests: List[Dict]) -> List[Dict]:
+            """Make multiple RPC calls in one request"""
+            payload = [
+                {
+                    'jsonrpc': '2.0',
+                    'id': str(i),
+                    'method': req['method'],
+                    'params': req.get('params', [])
+                }
+                for i, req in enumerate(requests)
+            ]
+            
+            response = requests.post(
+                f'{self.base_url}/v1/rpc/batch',
+                headers=self.headers,
+                json=payload
+            )
+            
+            return response.json()
+        
+        # Convenience methods
+        def get_status(self) -> Dict:
+            """Get network status"""
+            return self.call('status', [])
+        
+        def get_block(self, block_id: int) -> Dict:
+            """Get block by height or hash"""
+            return self.call('block', {'block_id': block_id})
+        
+        def view_account(self, account_id: str) -> Dict:
+            """View account details"""
+            return self.call('query', {
+                'request_type': 'view_account',
+                'finality': 'final',
+                'account_id': account_id
+            })
+        
+        def call_function(
+            self,
+            contract_id: str,
+            method_name: str,
+            args: Dict = None
+        ) -> Any:
+            """Call a view function on a contract"""
+            if args is None:
+                args = {}
+            
+            args_json = json.dumps(args)
+            args_base64 = base64.b64encode(args_json.encode()).decode()
+            
+            result = self.call('query', {
+                'request_type': 'call_function',
+                'finality': 'final',
+                'account_id': contract_id,
+                'method_name': method_name,
+                'args_base64': args_base64
+            })
+            
+            # Decode result
+            if 'result' in result:
+                result_bytes = bytes(result['result'])
+                return json.loads(result_bytes.decode())
+            
+            return result
+        
+        def get_tx_status(self, tx_hash: str, sender_id: str) -> Dict:
+            """Get transaction status"""
+            return self.call('tx', [tx_hash, sender_id])
+        
+        def get_validators(self) -> Dict:
+            """Get current validators"""
+            return self.call('validators', [None])
+        
+        def get_gas_price(self, block_id: Optional[int] = None) -> Dict:
+            """Get gas price"""
+            if block_id:
+                return self.call('gas_price', [block_id])
+            return self.call('gas_price', [None])
+
+    # Usage
+    client = NearRPCClient('YOUR_KEY')
+    
+    # Get network status
+    status = client.get_status()
+    print(f"Chain ID: {status['chain_id']}")
+    print(f"Latest block: {status['sync_info']['latest_block_height']}")
+    
+    # View account
+    account = client.view_account('example.near')
+    print(f"Balance: {account['amount']}")
+    
+    # Call contract function
+    metadata = client.call_function('wrap.near', 'ft_metadata')
+    print(f"Token name: {metadata['name']}")
+    
+    # Batch request
+    results = client.batch_call([
+        {'method': 'status'},
+        {
+            'method': 'query',
+            'params': {
+                'request_type': 'view_account',
+                'finality': 'final',
+                'account_id': 'near'
+            }
+        }
+    ])
+    print(f"Batch results: {len(results)} responses")
+    
+    # Get validators
+    validators = client.get_validators()
+    print(f"Active validators: {len(validators['current_validators'])}")
+    ```
+  </Tab>
+  
+  <Tab title="Go">
+    ```go
+    package main
+
+    import (
+        "bytes"
+        "encoding/base64"
+        "encoding/json"
+        "fmt"
+        "io"
+        "net/http"
+    )
+
+    type NearRPCClient struct {
+        BaseURL string
+        APIKey  string
+        Client  *http.Client
+    }
+
+    type RPCRequest struct {
+        JSONRPC string      `json:"jsonrpc"`
+        ID      string      `json:"id"`
+        Method  string      `json:"method"`
+        Params  interface{} `json:"params"`
+    }
+
+    type RPCResponse struct {
+        JSONRPC string          `json:"jsonrpc"`
+        ID      string          `json:"id"`
+        Result  json.RawMessage `json:"result,omitempty"`
+        Error   *RPCError       `json:"error,omitempty"`
+    }
+
+    type RPCError struct {
+        Code    int    `json:"code"`
+        Message string `json:"message"`
+        Data    string `json:"data,omitempty"`
+    }
+
+    func NewNearRPCClient(apiKey string) *NearRPCClient {
+        return &NearRPCClient{
+            BaseURL: "https://api.shadowcorp.dev",
+            APIKey:  apiKey,
+            Client:  &http.Client{},
+        }
+    }
+
+    func (c *NearRPCClient) Call(method string, params interface{}) (json.RawMessage, error) {
+        request := RPCRequest{
+            JSONRPC: "2.0",
+            ID:      "1",
+            Method:  method,
+            Params:  params,
+        }
+
+        jsonData, err := json.Marshal(request)
+        if err != nil {
+            return nil, err
+        }
+
+        req, err := http.NewRequest("POST", c.BaseURL+"/v1/rpc", bytes.NewBuffer(jsonData))
+        if err != nil {
+            return nil, err
+        }
+
+        req.Header.Set("Content-Type", "application/json")
+        req.Header.Set("X-API-Key", c.APIKey)
+
+        resp, err := c.Client.Do(req)
+        if err != nil {
+            return nil, err
+        }
+        defer resp.Body.Close()
+
+        body, err := io.ReadAll(resp.Body)
+        if err != nil {
+            return nil, err
+        }
+
+        var rpcResp RPCResponse
+        if err := json.Unmarshal(body, &rpcResp); err != nil {
+            return nil, err
+        }
+
+        if rpcResp.Error != nil {
+            return nil, fmt.Errorf("RPC error: %s", rpcResp.Error.Message)
+        }
+
+        return rpcResp.Result, nil
+    }
+
+    func (c *NearRPCClient) BatchCall(requests []RPCRequest) ([]RPCResponse, error) {
+        jsonData, err := json.Marshal(requests)
+        if err != nil {
+            return nil, err
+        }
+
+        req, err := http.NewRequest("POST", c.BaseURL+"/v1/rpc/batch", bytes.NewBuffer(jsonData))
+        if err != nil {
+            return nil, err
+        }
+
+        req.Header.Set("Content-Type", "application/json")
+        req.Header.Set("X-API-Key", c.APIKey)
+
+        resp, err := c.Client.Do(req)
+        if err != nil {
+            return nil, err
+        }
+        defer resp.Body.Close()
+
+        var responses []RPCResponse
+        if err := json.NewDecoder(resp.Body).Decode(&responses); err != nil {
+            return nil, err
+        }
+
+        return responses, nil
+    }
+
+    // Convenience methods
+    func (c *NearRPCClient) GetStatus() (json.RawMessage, error) {
+        return c.Call("status", []interface{}{})
+    }
+
+    func (c *NearRPCClient) ViewAccount(accountID string) (json.RawMessage, error) {
+        params := map[string]interface{}{
+            "request_type": "view_account",
+            "finality":     "final",
+            "account_id":   accountID,
+        }
+        return c.Call("query", params)
+    }
+
+    func (c *NearRPCClient) CallFunction(contractID, methodName string, args map[string]interface{}) (json.RawMessage, error) {
+        argsJSON, err := json.Marshal(args)
+        if err != nil {
+            return nil, err
+        }
+
+        argsBase64 := base64.StdEncoding.EncodeToString(argsJSON)
+
+        params := map[string]interface{}{
+            "request_type": "call_function",
+            "finality":     "final",
+            "account_id":   contractID,
+            "method_name":  methodName,
+            "args_base64":  argsBase64,
+        }
+
+        return c.Call("query", params)
+    }
+
+    func main() {
+        client := NewNearRPCClient("YOUR_KEY")
+
+        // Get status
+        status, err := client.GetStatus()
+        if err != nil {
+            panic(err)
+        }
+        fmt.Printf("Status: %s\n", string(status))
+
+        // View account
+        account, err := client.ViewAccount("example.near")
+        if err != nil {
+            panic(err)
+        }
+        fmt.Printf("Account: %s\n", string(account))
+
+        // Call contract function
+        result, err := client.CallFunction("wrap.near", "ft_metadata", map[string]interface{}{})
+        if err != nil {
+            panic(err)
+        }
+        fmt.Printf("Metadata: %s\n", string(result))
+
+        // Batch request
+        batchRequests := []RPCRequest{
+            {JSONRPC: "2.0", ID: "1", Method: "status", Params: []interface{}{}},
+            {
+                JSONRPC: "2.0",
+                ID:      "2",
+                Method:  "query",
+                Params: map[string]interface{}{
+                    "request_type": "view_account",
+                    "finality":     "final",
+                    "account_id":   "near",
+                },
+            },
+        }
+
+        responses, err := client.BatchCall(batchRequests)
+        if err != nil {
+            panic(err)
+        }
+        fmt.Printf("Batch responses: %d\n", len(responses))
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Common RPC Methods
+
+<AccordionGroup>
+  <Accordion title="Network Status" icon="signal">
+    Get current network status and node information:
+    
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": "1",
+      "method": "status",
+      "params": []
+    }
+    ```
+    
+    **Response:**
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": "1",
+      "result": {
+        "version": {
+          "version": "1.37.0",
+          "build": "crates-0.20.0"
+        },
+        "chain_id": "mainnet",
+        "protocol_version": 63,
+        "latest_protocol_version": 63,
+        "rpc_addr": "0.0.0.0:3030",
+        "validators": [...],
+        "sync_info": {
+          "latest_block_hash": "...",
+          "latest_block_height": 147835574,
+          "latest_state_root": "...",
+          "latest_block_time": "2026-01-03T18:20:21.819Z",
+          "syncing": false,
+          "earliest_block_hash": "...",
+          "earliest_block_height": 9820210,
+          "earliest_block_time": "2020-07-21T16:55:51.591Z"
+        }
+      }
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="View Account" icon="user">
+    Get account information including balance and storage:
+    
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": "1",
+      "method": "query",
+      "params": {
+        "request_type": "view_account",
+        "finality": "final",
+        "account_id": "example.near"
+      }
+    }
+    ```
+    
+    **Response:**
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": "1",
+      "result": {
+        "amount": "1000000000000000000000000",
+        "locked": "0",
+        "code_hash": "11111111111111111111111111111111",
+        "storage_usage": 182,
+        "storage_paid_at": 0,
+        "block_height": 147835574,
+        "block_hash": "..."
+      }
+    }
+    ```
+    
+    <Info>
+      `amount` and `locked` are in yoctoNEAR (10^-24 NEAR). Divide by 10^24 to get NEAR.
+    </Info>
+  </Accordion>
+  
+  <Accordion title="Call View Function" icon="function">
+    Call a read-only contract method:
+    
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": "1",
+      "method": "query",
+      "params": {
+        "request_type": "call_function",
+        "finality": "final",
+        "account_id": "wrap.near",
+        "method_name": "ft_metadata",
+        "args_base64": "e30="
+      }
+    }
+    ```
+    
+    **Args encoding:**
+    ```javascript
+    // Empty object
+    const args = {};
+    const argsBase64 = Buffer.from(JSON.stringify(args)).toString('base64');
+    // Result: "e30="
+    
+    // With parameters
+    const args = { account_id: "example.near" };
+    const argsBase64 = Buffer.from(JSON.stringify(args)).toString('base64');
+    ```
+    
+    **Response:**
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": "1",
+      "result": {
+        "result": [123, 34, 110, 97, 109, 101, 34, ...],
+        "logs": [],
+        "block_height": 147835574,
+        "block_hash": "..."
+      }
+    }
+    ```
+    
+    <Tip>
+      The `result` array contains UTF-8 bytes. Decode to get JSON: `JSON.parse(Buffer.from(result.result).toString())`
+    </Tip>
+  </Accordion>
+  
+  <Accordion title="Get Block" icon="cube">
+    Retrieve block information by height or hash:
+    
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": "1",
+      "method": "block",
+      "params": {
+        "block_id": 147835574
+      }
+    }
+    ```
+    
+    Or by hash:
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": "1",
+      "method": "block",
+      "params": {
+        "block_id": "BxSiQKTm3kFhAJGbVRb8UvNwRzN3PnSXN5vW3qVrXp3r"
+      }
+    }
+    ```
+    
+    Or use finality:
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": "1",
+      "method": "block",
+      "params": {
+        "finality": "final"
+      }
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Transaction Status" icon="receipt">
+    Get transaction status and outcome:
+    
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": "1",
+      "method": "tx",
+      "params": ["TRANSACTION_HASH", "sender.near"]
+    }
+    ```
+    
+    **Response includes:**
+    - Transaction status (success/failure)
+    - Gas used
+    - Logs
+    - Receipt outcomes
+    - State changes
+    
+    ```javascript
+    const getTxStatus = async (txHash, senderId) => {
+      const result = await client.call('tx', [txHash, senderId]);
+      
+      console.log('Status:', result.status);
+      console.log('Gas burned:', result.transaction_outcome.outcome.gas_burnt);
+      console.log('Logs:', result.receipts_outcome.map(r => r.outcome.logs));
+      
+      return result;
+    };
+    ```
+  </Accordion>
+  
+  <Accordion title="Gas Price" icon="gas-pump">
+    Get current gas price:
+    
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": "1",
+      "method": "gas_price",
+      "params": [null]
+    }
+    ```
+    
+    Or for a specific block:
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": "1",
+      "method": "gas_price",
+      "params": [147835574]
+    }
+    ```
+    
+    **Response:**
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": "1",
+      "result": {
+        "gas_price": "100000000"
+      }
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Validators" icon="server">
+    Get current and next epoch validators:
+    
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": "1",
+      "method": "validators",
+      "params": [null]
+    }
+    ```
+    
+    **Response:**
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": "1",
+      "result": {
+        "current_validators": [...],
+        "next_validators": [...],
+        "current_proposals": [...]
+      }
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="View Access Keys" icon="key">
+    List access keys for an account:
+    
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": "1",
+      "method": "query",
+      "params": {
+        "request_type": "view_access_key_list",
+        "finality": "final",
+        "account_id": "example.near"
+      }
+    }
+    ```
+    
+    View specific access key:
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": "1",
+      "method": "query",
+      "params": {
+        "request_type": "view_access_key",
+        "finality": "final",
+        "account_id": "example.near",
+        "public_key": "ed25519:..."
+      }
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Response Format
+
+### Success Response
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": "1",
+  "result": {
+    // Method-specific result data
+  }
+}
+```
+
+### Error Response
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": "1",
+  "error": {
+    "code": -32600,
+    "message": "Invalid Request",
+    "data": "Additional error details"
+  }
+}
+```
+
+### Batch Response
+
+```json
+[
+  {
+    "jsonrpc": "2.0",
+    "id": "1",
+    "result": { ... }
+  },
+  {
+    "jsonrpc": "2.0",
+    "id": "2",
+    "result": { ... }
+  }
+]
+```
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Account Monitoring" icon="binoculars" color="#3b82f6">
+    Monitor account balances, access keys, and state changes in real-time.
+  </Card>
+  
+  <Card title="Contract Integration" icon="puzzle-piece" color="#8b5cf6">
+    Read contract state and call view methods for dApp integration.
+  </Card>
+  
+  <Card title="Block Explorers" icon="magnifying-glass-chart" color="#f59e0b">
+    Build blockchain explorers with full access to blocks and transactions.
+  </Card>
+  
+  <Card title="Transaction Tracking" icon="route" color="#10b981">
+    Track transaction status and receipt outcomes for payment systems.
+  </Card>
+</CardGroup>
+
+## Advanced Examples
+
+### Multi-Account Balance Checker
+
+```javascript
+class BalanceChecker {
+  constructor(apiKey) {
+    this.client = new NearRPCClient(apiKey);
+  }
+
+  async getBalance(accountId) {
+    try {
+      const result = await this.client.viewAccount(accountId);
+      const balanceYocto = result.amount;
+      const balanceNear = parseFloat(balanceYocto) / 1e24;
+      
+      return {
+        accountId,
+        balance: balanceNear,
+        balanceYocto,
+        locked: result.locked,
+        storageUsage: result.storage_usage
+      };
+    } catch (error) {
+      return {
+        accountId,
+        error: error.message
+      };
+    }
+  }
+
+  async checkMultipleBalances(accountIds) {
+    const requests = accountIds.map((accountId, index) => ({
+      jsonrpc: '2.0',
+      id: index.toString(),
+      method: 'query',
+      params: {
+        request_type: 'view_account',
+        finality: 'final',
+        account_id: accountId
+      }
+    }));
+
+    const responses = await this.client.batchCall(requests);
+    
+    return responses.map((resp, index) => {
+      if (resp.error) {
+        return {
+          accountId: accountIds[index],
+          error: resp.error.message
+        };
+      }
+
+      const balanceYocto = resp.result.amount;
+      const balanceNear = parseFloat(balanceYocto) / 1e24;
+
+      return {
+        accountId: accountIds[index],
+        balance: balanceNear,
+        balanceYocto,
+        locked: resp.result.locked,
+        storageUsage: resp.result.storage_usage
+      };
+    });
+  }
+
+  async getTotalBalance(accountIds) {
+    const balances = await this.checkMultipleBalances(accountIds);
+    
+    const total = balances.reduce((sum, item) => {
+      if (!item.error) {
+        return sum + item.balance;
+      }
+      return sum;
+    }, 0);
+
+    return {
+      accounts: balances.length,
+      totalBalance: total,
+      balances
+    };
+  }
+}
+
+// Usage
+const checker = new BalanceChecker('YOUR_KEY');
+
+// Single account
+const balance = await checker.getBalance('example.near');
+console.log(`Balance: ${balance.balance} NEAR`);
+
+// Multiple accounts
+const accounts = ['near', 'example.near', 'aurora'];
+const balances = await checker.checkMultipleBalances(accounts);
+balances.forEach(b => {
+  if (b.error) {
+    console.log(`${b.accountId}: Error - ${b.error}`);
+  } else {
+    console.log(`${b.accountId}: ${b.balance.toFixed(2)} NEAR`);
+  }
+});
+
+// Total balance
+const total = await checker.getTotalBalance(accounts);
+console.log(`Total: ${total.totalBalance.toFixed(2)} NEAR across ${total.accounts} accounts`);
+```
+
+### Contract State Reader
+
+```javascript
+class ContractStateReader {
+  constructor(apiKey) {
+    this.client = new NearRPCClient(apiKey);
+  }
+
+  async callViewMethod(contractId, methodName, args = {}) {
+    const result = await this.client.callFunction(contractId, methodName, args);
+    
+    // Decode the result
+    const resultBytes = Buffer.from(result.result);
+    return JSON.parse(resultBytes.toString());
+  }
+
+  async getFTMetadata(contractId) {
+    return await this.callViewMethod(contractId, 'ft_metadata');
+  }
+
+  async getFTBalance(contractId, accountId) {
+    const result = await this.callViewMethod(contractId, 'ft_balance_of', {
+      account_id: accountId
+    });
+    return result;
+  }
+
+  async getNFTTokens(contractId, accountId, fromIndex = 0, limit = 50) {
+    return await this.callViewMethod(contractId, 'nft_tokens_for_owner', {
+      account_id: accountId,
+      from_index: fromIndex.toString(),
+      limit: limit
+    });
+  }
+
+  async batchReadContracts(contracts) {
+    const requests = contracts.map((contract, index) => {
+      const argsBase64 = Buffer.from(
+        JSON.stringify(contract.args || {})
+      ).toString('base64');
+
+      return {
+        jsonrpc: '2.0',
+        id: index.toString(),
+        method: 'query',
+        params: {
+          request_type: 'call_function',
+          finality: 'final',
+          account_id: contract.contractId,
+          method_name: contract.methodName,
+          args_base64: argsBase64
+        }
+      };
+    });
+
+    const responses = await this.client.batchCall(requests);
+
+    return responses.map((resp, index) => {
+      if (resp.error) {
+        return {
+          contract: contracts[index],
+          error: resp.error.message
+        };
+      }
+
+      try {
+        const resultBytes = Buffer.from(resp.result.result);
+        const data = JSON.parse(resultBytes.toString());
+        
+        return {
+          contract: contracts[index],
+          data
+        };
+      } catch (error) {
+        return {
+          contract: contracts[index],
+          error: 'Failed to parse result'
+        };
+      }
+    });
+  }
+}
+
+// Usage
+const reader = new ContractStateReader('YOUR_KEY');
+
+// Get FT metadata
+const wNearMetadata = await reader.getFTMetadata('wrap.near');
+console.log('Token:', wNearMetadata.name);
+console.log('Symbol:', wNearMetadata.symbol);
+console.log('Decimals:', wNearMetadata.decimals);
+
+// Get FT balance
+const balance = await reader.getFTBalance('wrap.near', 'example.near');
+console.log('Balance:', balance);
+
+// Batch read multiple contracts
+const contracts = [
+  { contractId: 'wrap.near', methodName: 'ft_metadata' },
+  { contractId: 'usdt.tether-token.near', methodName: 'ft_metadata' },
+  { 
+    contractId: 'wrap.near', 
+    methodName: 'ft_balance_of',
+    args: { account_id: 'example.near' }
+  }
+];
+
+const results = await reader.batchReadContracts(contracts);
+results.forEach((result, index) => {
+  if (result.error) {
+    console.log(`Contract ${index}: Error - ${result.error}`);
+  } else {
+    console.log(`Contract ${index}:`, result.data);
+  }
+});
+```
+
+### Block Monitor
+
+```javascript
+class BlockMonitor {
+  constructor(apiKey) {
+    this.client = new NearRPCClient(apiKey);
+    this.lastBlockHeight = null;
+    this.isMonitoring = false;
+  }
+
+  async getLatestBlock() {
+    return await this.client.call('block', { finality: 'final' });
+  }
+
+  async getBlockByHeight(height) {
+    return await this.client.call('block', { block_id: height });
+  }
+
+  async getBlockRange(startHeight, endHeight) {
+    const requests = [];
+    
+    for (let height = startHeight; height <= endHeight; height++) {
+      requests.push({
+        jsonrpc: '2.0',
+        id: height.toString(),
+        method: 'block',
+        params: { block_id: height }
+      });
+    }
+
+    return await this.client.batchCall(requests);
+  }
+
+  async startMonitoring(callback, pollInterval = 1000) {
+    if (this.isMonitoring) {
+      console.log('Already monitoring');
+      return;
+    }
+
+    this.isMonitoring = true;
+    console.log('Started block monitoring');
+
+    while (this.isMonitoring) {
+      try {
+        const block = await this.getLatestBlock();
+        const currentHeight = block.header.height;
+
+        if (this.lastBlockHeight === null) {
+          this.lastBlockHeight = currentHeight;
+        } else if (currentHeight > this.lastBlockHeight) {
+          // New blocks detected
+          const newBlocks = currentHeight - this.lastBlockHeight;
+          console.log(`New blocks: ${newBlocks}`);
+
+          // Fetch all new blocks
+          for (let h = this.lastBlockHeight + 1; h <= currentHeight; h++) {
+            const newBlock = await this.getBlockByHeight(h);
+            callback(newBlock);
+          }
+
+          this.lastBlockHeight = currentHeight;
+        }
+      } catch (error) {
+        console.error('Error monitoring blocks:', error.message);
+      }
+
+      await new Promise(resolve => setTimeout(resolve, pollInterval));
+    }
+  }
+
+  stopMonitoring() {
+    this.isMonitoring = false;
+    console.log('Stopped block monitoring');
+  }
+
+  analyzeBlock(block) {
+    return {
+      height: block.header.height,
+      hash: block.header.hash,
+      timestamp: block.header.timestamp,
+      gasPrice: block.header.gas_price,
+      totalSupply: block.header.total_supply,
+      chunksCount: block.chunks.length,
+      transactionsCount: block.chunks.reduce(
+        (sum, chunk) => sum + chunk.tx_root.length,
+        0
+      )
+    };
+  }
+}
+
+// Usage
+const monitor = new BlockMonitor('YOUR_KEY');
+
+// Get latest block
+const latest = await monitor.getLatestBlock();
+console.log('Latest block:', latest.header.height);
+
+// Analyze block
+const analysis = monitor.analyzeBlock(latest);
+console.log('Block analysis:', analysis);
+
+// Monitor new blocks
+monitor.startMonitoring((block) => {
+  const info = monitor.analyzeBlock(block);
+  console.log(`New block ${info.height}: ${info.transactionsCount} transactions`);
+});
+
+// Stop after 1 minute
+setTimeout(() => {
+  monitor.stopMonitoring();
+}, 60000);
+```
+
+### Transaction Tracker
+
+```javascript
+class TransactionTracker {
+  constructor(apiKey) {
+    this.client = new NearRPCClient(apiKey);
+  }
+
+  async getTxStatus(txHash, senderId) {
+    return await this.client.getTxStatus(txHash, senderId);
+  }
+
+  async waitForTransaction(txHash, senderId, timeout = 60000) {
+    const startTime = Date.now();
+    const pollInterval = 2000;
+
+    while (Date.now() - startTime < timeout) {
+      try {
+        const result = await this.getTxStatus(txHash, senderId);
+        
+        if (result.status && typeof result.status === 'object') {
+          // Transaction completed
+          return {
+            success: 'SuccessValue' in result.status,
+            result,
+            elapsed: Date.now() - startTime
+          };
+        }
+      } catch (error) {
+        // Transaction not found yet or still processing
+        if (!error.message.includes('UNKNOWN_TRANSACTION')) {
+          throw error;
+        }
+      }
+
+      await new Promise(resolve => setTimeout(resolve, pollInterval));
+    }
+
+    throw new Error('Transaction timeout');
+  }
+
+  extractTxInfo(txResult) {
+    const status = txResult.status;
+    const outcome = txResult.transaction_outcome.outcome;
+
+    return {
+      txHash: txResult.transaction.hash,
+      signerId: txResult.transaction.signer_id,
+      receiverId: txResult.transaction.receiver_id,
+      success: 'SuccessValue' in status || 'SuccessReceiptId' in status,
+      gasBurned: outcome.gas_burnt,
+      tokensBurned: outcome.tokens_burnt,
+      logs: txResult.receipts_outcome.flatMap(r => r.outcome.logs),
+      receiptIds: txResult.receipts_outcome.map(r => r.id)
+    };
+  }
+
+  async trackMultipleTransactions(transactions) {
+    const promises = transactions.map(tx => 
+      this.waitForTransaction(tx.hash, tx.senderId)
+        .then(result => ({ ...tx, ...result }))
+        .catch(error => ({ ...tx, error: error.message }))
+    );
+
+    return await Promise.all(promises);
+  }
+}
+
+// Usage
+const tracker = new TransactionTracker('YOUR_KEY');
+
+// Track single transaction
+const txHash = 'TRANSACTION_HASH';
+const senderId = 'example.near';
+
+try {
+  const result = await tracker.waitForTransaction(txHash, senderId);
+  
+  if (result.success) {
+    console.log('✅ Transaction successful');
+    const info = tracker.extractTxInfo(result.result);
+    console.log(`Gas burned: ${info.gasBurned}`);
+    console.log(`Logs:`, info.logs);
+  } else {
+    console.log('❌ Transaction failed');
+  }
+} catch (error) {
+  console.error('Error:', error.message);
+}
+
+// Track multiple transactions
+const txs = [
+  { hash: 'TX_HASH_1', senderId: 'user1.near' },
+  { hash: 'TX_HASH_2', senderId: 'user2.near' },
+  { hash: 'TX_HASH_3', senderId: 'user3.near' }
+];
+
+const results = await tracker.trackMultipleTransactions(txs);
+results.forEach(result => {
+  if (result.error) {
+    console.log(`${result.hash}: Error - ${result.error}`);
+  } else {
+    console.log(`${result.hash}: ${result.success ? 'Success' : 'Failed'} (${result.elapsed}ms)`);
+  }
+});
+```
+
+## Error Codes
+
+### Standard JSON-RPC Errors
+
+| Code | Message | Description |
+|------|---------|-------------|
+| -32700 | Parse error | Invalid JSON |
+| -32600 | Invalid Request | Request is not valid JSON-RPC |
+| -32601 | Method not found | Method does not exist |
+| -32602 | Invalid params | Invalid method parameters |
+| -32603 | Internal error | Internal JSON-RPC error |
+
+### NEAR-Specific Errors
+
+| Error | Description |
+|-------|-------------|
+| UNKNOWN_ACCOUNT | Account does not exist |
+| UNKNOWN_BLOCK | Block not found |
+| UNKNOWN_TRANSACTION | Transaction not found |
+| TIMEOUT_ERROR | Request timeout |
+| HANDLER_ERROR | Error in request handler |
+
+### Example Error Handling
+
+```javascript
+class ErrorHandler {
+  static isAccountNotFound(error) {
+    return error.message && error.message.includes('UNKNOWN_ACCOUNT');
+  }
+
+  static isBlockNotFound(error) {
+    return error.message && error.message.includes('UNKNOWN_BLOCK');
+  }
+
+  static isTxNotFound(error) {
+    return error.message && error.message.includes('UNKNOWN_TRANSACTION');
+  }
+
+  static async handleRPCCall(callFn, fallback = null) {
+    try {
+      return await callFn();
+    } catch (error) {
+      if (this.isAccountNotFound(error)) {
+        console.log('Account does not exist');
+        return fallback;
+      }
+      
+      if (this.isBlockNotFound(error)) {
+        console.log('Block not found');
+        return fallback;
+      }
+
+      if (this.isTxNotFound(error)) {
+        console.log('Transaction not found or still processing');
+        return fallback;
+      }
+
+      // Unknown error, rethrow
+      throw error;
+    }
+  }
+}
+
+// Usage
+const client = new NearRPCClient('YOUR_KEY');
+
+const account = await ErrorHandler.handleRPCCall(
+  () => client.viewAccount('nonexistent.near'),
+  { amount: '0', exists: false }
+);
+
+if (!account.exists) {
+  console.log('Using fallback account data');
+}
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Batch Requests" icon="layer-group">
+    Always use batch requests when fetching multiple pieces of data:
+    
+    ```javascript
+    // ❌ Bad: Multiple sequential requests
+    const account1 = await client.viewAccount('user1.near');
+    const account2 = await client.viewAccount('user2.near');
+    const account3 = await client.viewAccount('user3.near');
+
+    // ✅ Good: Single batch request
+    const results = await client.batchCall([
+      {
+        method: 'query',
+        params: {
+          request_type: 'view_account',
+          finality: 'final',
+          account_id: 'user1.near'
+        }
+      },
+      {
+        method: 'query',
+        params: {
+          request_type: 'view_account',
+          finality: 'final',
+          account_id: 'user2.near'
+        }
+      },
+      {
+        method: 'query',
+        params: {
+          request_type: 'view_account',
+          finality: 'final',
+          account_id: 'user3.near'
+        }
+      }
+    ]);
+    ```
+  </Accordion>
+  
+  <Accordion title="Result Decoding" icon="code">
+    Always decode contract call results properly:
+    
+    ```javascript
+    const decodeResult = (result) => {
+      if (!result.result) {
+        throw new Error('No result in response');
+      }
+
+      try {
+        // Convert byte array to string
+        const resultBytes = Buffer.from(result.result);
+        const resultString = resultBytes.toString('utf8');
+        
+        // Parse JSON
+        return JSON.parse(resultString);
+      } catch (error) {
+        console.error('Failed to decode result:', error);
+        throw new Error('Invalid result format');
+      }
+    };
+
+    const result = await client.callFunction('contract.near', 'get_data');
+    const decoded = decodeResult(result);
+    ```
+  </Accordion>
+  
+  <Accordion title="Finality Handling" icon="check-double">
+    Choose appropriate finality for your use case:
+    
+    ```javascript
+    // For most queries: use 'final' (2-3 second old)
+    const account = await client.call('query', {
+      request_type: 'view_account',
+      finality: 'final',
+      account_id: 'example.near'
+    });
+
+    // For latest data: use 'optimistic' (latest block)
+    const latestAccount = await client.call('query', {
+      request_type: 'view_account',
+      finality: 'optimistic',
+      account_id: 'example.near'
+    });
+
+    // For historical data: use specific block height
+    const historicalAccount = await client.call('query', {
+      request_type: 'view_account',
+      block_id: 147800000,
+      account_id: 'example.near'
+    });
+    ```
+    
+    **Finality options:**
+    - `final`: Finalized block (recommended for most uses)
+    - `optimistic`: Latest block (may be reorganized)
+    - `block_id`: Specific block height or hash
+  </Accordion>
+  
+  <Accordion title="Rate Limiting" icon="gauge">
+    Implement proper rate limiting and retry logic:
+    
+    ```javascript
+    class RateLimitedClient {
+      constructor(apiKey, maxRequestsPerSecond = 10) {
+        this.client = new NearRPCClient(apiKey);
+        this.maxRequests = maxRequestsPerSecond;
+        this.requestQueue = [];
+        this.processing = false;
+      }
+
+      async call(method, params) {
+        return new Promise((resolve, reject) => {
+          this.requestQueue.push({ method, params, resolve, reject });
+          this.processQueue();
+        });
+      }
+
+      async processQueue() {
+        if (this.processing || this.requestQueue.length === 0) {
+          return;
+        }
+
+        this.processing = true;
+        const delay = 1000 / this.maxRequests;
+
+        while (this.requestQueue.length > 0) {
+          const request = this.requestQueue.shift();
+          
+          try {
+            const result = await this.client.call(
+              request.method,
+              request.params
+            );
+            request.resolve(result);
+          } catch (error) {
+            request.reject(error);
+          }
+
+          if (this.requestQueue.length > 0) {
+            await new Promise(resolve => setTimeout(resolve, delay));
+          }
+        }
+
+        this.processing = false;
+      }
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+  <Card 
+    title="RPC" 
+    icon="brackets-curly" 
+    href="/shadow-api/endpoints/json-rpc"
+  >
+    RPC endpoint for common operations
+  </Card>
+  
+  <Card 
+    title="Graph Queries" 
+    icon="diagram-project" 
+    href="/shadow-api/endpoints/graph"
+  >
+    Neo4j graph database for relationship analysis
+  </Card>
+  
+  <Card 
+    title="Transactions" 
+    icon="exchange" 
+    href="/shadow-api/endpoints/transactions"
+  >
+    Simplified transaction lookup endpoints
+  </Card>
+  
+  <Card 
+    title="Accounts" 
+    icon="user" 
+    href="/shadow-api/endpoints/full-account-data"
+  >
+    Enhanced account data with analytics
+  </Card>
+</CardGroup>

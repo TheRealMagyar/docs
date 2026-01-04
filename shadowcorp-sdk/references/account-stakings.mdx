@@ -1,0 +1,443 @@
+---
+title: "Account Stakings"
+description: "Query staking information for NEAR accounts, including staked balances, unstaked amounts, and validator pool details. Track delegated stake across validator pools and withdrawal availability."
+icon: pie-chart
+---
+
+import { Callout } from '@/components/ui/callout'
+
+## Get Staking Information
+
+```typescript
+import { ShadowCorpSDK } from 'shadowcorp';
+
+const sdk = new ShadowCorpSDK('your-api-key');
+
+const staking = await sdk.accounts.getStaking('example.near', {
+  pool: 'shadowcorp.pool.near'
+});
+console.log(staking);
+```
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `accountId` | `string` | Yes | NEAR account identifier |
+| `params` | `object` | No | Optional parameters |
+| `params.pool` | `string` | No | Specific validator pool ID to query |
+
+<Callout type="info">
+If no pool is specified, the query returns staking information for all pools where the account has delegated stake.
+</Callout>
+
+### Response Structure
+
+```typescript
+{
+  account_id: string;                 // Account identifier
+  pool_id: string;                    // Validator pool identifier
+  staked_balance: string;             // Currently staked amount (yoctoNEAR)
+  unstaked_balance: string;           // Unstaked amount awaiting withdrawal (yoctoNEAR)
+  can_withdraw: boolean;              // Whether unstaked funds can be withdrawn
+}
+```
+
+### Example Response
+
+```json
+{
+  "account_id": "therealmagyar.near",
+  "pool_id": "shadowcorp.pool.near",
+  "staked_balance": "100086222688140095978706",
+  "unstaked_balance": "2450189691282827051472744",
+  "can_withdraw": true
+}
+```
+
+### Error Handling
+
+```typescript
+try {
+  const staking = await sdk.accounts.getStaking('example.near', {
+    pool: 'nonexistent.pool.near'
+  });
+} catch (error) {
+  if (error.message.includes('not found')) {
+    console.log('Account or pool not found');
+  } else {
+    console.error('Query failed:', error);
+  }
+}
+```
+
+## Understanding Staking Data
+
+### Staked Balance
+
+The `staked_balance` represents NEAR tokens actively staking with the validator pool, earning rewards:
+
+```typescript
+function formatNEAR(yoctoNEAR: string): string {
+  const amount = BigInt(yoctoNEAR);
+  const divisor = BigInt('1000000000000000000000000');
+  const whole = amount / divisor;
+  const fraction = amount % divisor;
+  const fractionStr = fraction.toString().padStart(24, '0').substring(0, 4);
+  return `${whole}.${fractionStr}`;
+}
+
+const staking = await sdk.accounts.getStaking('therealmagyar.near', {
+  pool: 'shadowcorp.pool.near'
+});
+
+console.log(`Staked: ${formatNEAR(staking.staked_balance)} NEAR`);
+// Output: "Staked: 100.0862 NEAR"
+```
+
+### Unstaked Balance
+
+The `unstaked_balance` shows tokens that have been unstaked but are still in the cooling-off period (typically 2-4 epochs, ~52-104 hours):
+
+```typescript
+const staking = await sdk.accounts.getStaking('example.near', {
+  pool: 'pool.near'
+});
+
+if (BigInt(staking.unstaked_balance) > 0n) {
+  console.log(`Unstaked: ${formatNEAR(staking.unstaked_balance)} NEAR`);
+  console.log(`Can withdraw: ${staking.can_withdraw ? 'Yes' : 'No (cooling off)'}`);
+}
+```
+
+### Withdrawal Availability
+
+The `can_withdraw` flag indicates whether unstaked funds have completed the cooling-off period:
+
+```typescript
+const staking = await sdk.accounts.getStaking('example.near', {
+  pool: 'pool.near'
+});
+
+if (staking.can_withdraw && BigInt(staking.unstaked_balance) > 0n) {
+  console.log(`Ready to withdraw: ${formatNEAR(staking.unstaked_balance)} NEAR`);
+} else if (BigInt(staking.unstaked_balance) > 0n) {
+  console.log('Unstaked funds still in cooling-off period');
+}
+```
+
+## Use Cases
+
+### Staking Dashboard
+
+Display comprehensive staking information:
+
+```typescript
+async function getStakingDashboard(accountId: string, poolId: string) {
+  const staking = await sdk.accounts.getStaking(accountId, { pool: poolId });
+  
+  const staked = BigInt(staking.staked_balance);
+  const unstaked = BigInt(staking.unstaked_balance);
+  const total = staked + unstaked;
+  
+  return {
+    account: staking.account_id,
+    pool: staking.pool_id,
+    staked: {
+      amount: formatNEAR(staked.toString()),
+      percentage: total > 0n ? ((Number(staked) / Number(total)) * 100).toFixed(2) + '%' : '0%'
+    },
+    unstaked: {
+      amount: formatNEAR(unstaked.toString()),
+      percentage: total > 0n ? ((Number(unstaked) / Number(total)) * 100).toFixed(2) + '%' : '0%',
+      canWithdraw: staking.can_withdraw
+    },
+    total: formatNEAR(total.toString())
+  };
+}
+
+const dashboard = await getStakingDashboard('therealmagyar.near', 'shadowcorp.pool.near');
+console.log(`Total: ${dashboard.total} NEAR`);
+console.log(`Staked: ${dashboard.staked.amount} (${dashboard.staked.percentage})`);
+console.log(`Unstaked: ${dashboard.unstaked.amount} (${dashboard.unstaked.percentage})`);
+```
+
+### Multi-Pool Staking Query
+
+Check staking across multiple validator pools:
+
+```typescript
+async function getMultiPoolStaking(accountId: string, poolIds: string[]) {
+  const stakingInfo = await Promise.allSettled(
+    poolIds.map(pool => sdk.accounts.getStaking(accountId, { pool }))
+  );
+  
+  return poolIds.map((poolId, index) => {
+    const result = stakingInfo[index];
+    
+    if (result.status === 'fulfilled') {
+      const staking = result.value;
+      const total = BigInt(staking.staked_balance) + BigInt(staking.unstaked_balance);
+      
+      return {
+        pool: poolId,
+        staked: formatNEAR(staking.staked_balance),
+        unstaked: formatNEAR(staking.unstaked_balance),
+        total: formatNEAR(total.toString()),
+        hasStake: total > 0n
+      };
+    } else {
+      return {
+        pool: poolId,
+        staked: '0',
+        unstaked: '0',
+        total: '0',
+        hasStake: false
+      };
+    }
+  });
+}
+
+const pools = await getMultiPoolStaking('example.near', [
+  'shadowcorp.pool.near',
+  'zavodil.poolv1.near',
+  'staked.poolv1.near'
+]);
+
+console.table(pools);
+```
+
+### Withdrawal Calculator
+
+Calculate how much can be withdrawn and when:
+
+```typescript
+async function calculateWithdrawable(accountId: string, poolId: string) {
+  const staking = await sdk.accounts.getStaking(accountId, { pool: poolId });
+  
+  const unstaked = BigInt(staking.unstaked_balance);
+  
+  if (unstaked === 0n) {
+    return {
+      withdrawable: '0 NEAR',
+      pending: '0 NEAR',
+      canWithdrawNow: false,
+      status: 'No unstaked balance'
+    };
+  }
+  
+  if (staking.can_withdraw) {
+    return {
+      withdrawable: `${formatNEAR(unstaked.toString())} NEAR`,
+      pending: '0 NEAR',
+      canWithdrawNow: true,
+      status: 'Ready to withdraw'
+    };
+  }
+  
+  return {
+    withdrawable: '0 NEAR',
+    pending: `${formatNEAR(unstaked.toString())} NEAR`,
+    canWithdrawNow: false,
+    status: 'Cooling off (2-4 epochs remaining)'
+  };
+}
+
+const withdrawInfo = await calculateWithdrawable('example.near', 'pool.near');
+console.log(withdrawInfo);
+```
+
+### Staking Rewards Estimator
+
+Estimate potential staking rewards:
+
+```typescript
+async function estimateRewards(
+  accountId: string, 
+  poolId: string, 
+  annualAPY: number = 10 // Default 10% APY
+) {
+  const staking = await sdk.accounts.getStaking(accountId, { pool: poolId });
+  
+  const stakedAmount = BigInt(staking.staked_balance);
+  const dailyRate = annualAPY / 365 / 100;
+  const monthlyRate = annualAPY / 12 / 100;
+  const yearlyRate = annualAPY / 100;
+  
+  const stakedNEAR = Number(stakedAmount) / 1e24;
+  
+  return {
+    staked: `${formatNEAR(stakedAmount.toString())} NEAR`,
+    estimatedRewards: {
+      daily: `${(stakedNEAR * dailyRate).toFixed(4)} NEAR`,
+      monthly: `${(stakedNEAR * monthlyRate).toFixed(4)} NEAR`,
+      yearly: `${(stakedNEAR * yearlyRate).toFixed(4)} NEAR`
+    },
+    apy: `${annualAPY}%`
+  };
+}
+
+const rewards = await estimateRewards('example.near', 'pool.near', 10);
+console.log('Estimated rewards:');
+console.log(`Daily: ${rewards.estimatedRewards.daily}`);
+console.log(`Monthly: ${rewards.estimatedRewards.monthly}`);
+console.log(`Yearly: ${rewards.estimatedRewards.yearly}`);
+```
+
+### Staking Portfolio Analyzer
+
+Analyze an account's complete staking portfolio:
+
+```typescript
+async function analyzeStakingPortfolio(accountId: string) {
+  // You would need to get all pools the account has staked with
+  // This is a simplified example
+  const knownPools = [
+    'shadowcorp.pool.near',
+    'zavodil.poolv1.near',
+    'staked.poolv1.near'
+  ];
+  
+  const allStaking = await Promise.allSettled(
+    knownPools.map(pool => sdk.accounts.getStaking(accountId, { pool }))
+  );
+  
+  let totalStaked = 0n;
+  let totalUnstaked = 0n;
+  let poolsWithStake = 0;
+  let withdrawableAmount = 0n;
+  
+  const poolDetails = [];
+  
+  allStaking.forEach((result, index) => {
+    if (result.status === 'fulfilled') {
+      const staking = result.value;
+      const staked = BigInt(staking.staked_balance);
+      const unstaked = BigInt(staking.unstaked_balance);
+      
+      if (staked > 0n || unstaked > 0n) {
+        totalStaked += staked;
+        totalUnstaked += unstaked;
+        poolsWithStake++;
+        
+        if (staking.can_withdraw) {
+          withdrawableAmount += unstaked;
+        }
+        
+        poolDetails.push({
+          pool: staking.pool_id,
+          staked: formatNEAR(staked.toString()),
+          unstaked: formatNEAR(unstaked.toString())
+        });
+      }
+    }
+  });
+  
+  const totalValue = totalStaked + totalUnstaked;
+  
+  return {
+    accountId,
+    summary: {
+      totalValue: `${formatNEAR(totalValue.toString())} NEAR`,
+      totalStaked: `${formatNEAR(totalStaked.toString())} NEAR`,
+      totalUnstaked: `${formatNEAR(totalUnstaked.toString())} NEAR`,
+      withdrawable: `${formatNEAR(withdrawableAmount.toString())} NEAR`,
+      poolsWithStake
+    },
+    pools: poolDetails
+  };
+}
+
+const portfolio = await analyzeStakingPortfolio('example.near');
+console.log('Staking Portfolio:', portfolio.summary);
+console.table(portfolio.pools);
+```
+
+### Staking Status Monitor
+
+Monitor staking status changes:
+
+```typescript
+class StakingMonitor {
+  private lastStaked: string | null = null;
+  private lastUnstaked: string | null = null;
+  
+  async monitor(accountId: string, poolId: string) {
+    const staking = await sdk.accounts.getStaking(accountId, { pool: poolId });
+    
+    if (this.lastStaked && this.lastStaked !== staking.staked_balance) {
+      const change = BigInt(staking.staked_balance) - BigInt(this.lastStaked);
+      const direction = change > 0n ? '📈 Increased' : '📉 Decreased';
+      console.log(`${direction} staking: ${formatNEAR(change.toString().replace('-', ''))} NEAR`);
+    }
+    
+    if (this.lastUnstaked && this.lastUnstaked !== staking.unstaked_balance) {
+      console.log('⚠️ Unstaked balance changed');
+    }
+    
+    if (staking.can_withdraw && BigInt(staking.unstaked_balance) > 0n) {
+      console.log('✅ Funds ready to withdraw!');
+    }
+    
+    this.lastStaked = staking.staked_balance;
+    this.lastUnstaked = staking.unstaked_balance;
+  }
+}
+
+const monitor = new StakingMonitor();
+setInterval(() => monitor.monitor('example.near', 'pool.near'), 30000); // Check every 30s
+```
+
+## Best Practices
+
+### Always Use BigInt
+
+<Callout type="warning">
+NEAR amounts must be handled with `BigInt` to avoid precision loss.
+</Callout>
+
+```typescript
+// ❌ Incorrect
+const staked = Number('100086222688140095978706');
+
+// ✅ Correct
+const staked = BigInt('100086222688140095978706');
+```
+
+### Check Withdrawal Status
+
+Always verify `can_withdraw` before assuming funds are available:
+
+```typescript
+async function safeGetWithdrawable(accountId: string, poolId: string) {
+  const staking = await sdk.accounts.getStaking(accountId, { pool: poolId });
+  
+  if (!staking.can_withdraw) {
+    return '0'; // Not yet withdrawable
+  }
+  
+  return staking.unstaked_balance;
+}
+```
+
+### Handle Missing Pools
+
+Not all accounts have staking with every pool:
+
+```typescript
+async function getSafeStaking(accountId: string, poolId: string) {
+  try {
+    return await sdk.accounts.getStaking(accountId, { pool: poolId });
+  } catch (error) {
+    return {
+      account_id: accountId,
+      pool_id: poolId,
+      staked_balance: '0',
+      unstaked_balance: '0',
+      can_withdraw: false
+    };
+  }
+}
+```
+
+For support: [support@shadowcorp.dev](mailto:support@shadowcorp.dev)

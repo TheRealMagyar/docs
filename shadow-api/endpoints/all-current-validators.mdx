@@ -1,0 +1,1491 @@
+---
+title: All Current Validators
+description: Retrieve the complete list of active validators on the NEAR blockchain. Access validator stakes, slashing status, epoch information, and network consensus data.
+icon: server
+---
+
+import { Endpoint, Request } from '@mintlify/components';
+
+## Get All Current Validators
+
+<Endpoint method="GET" path="/v1/validators" />
+
+Retrieve comprehensive information about all active validators currently participating in NEAR's consensus mechanism, including their stakes, slashing status, and epoch data.
+
+<Info>
+  This endpoint returns real-time validator data for the current epoch. Validators secure the NEAR network by validating transactions and producing blocks.
+</Info>
+
+### Making Requests
+
+<Tabs>
+  <Tab title="cURL">
+    **Get all validators:**
+    ```bash
+    curl -H "X-API-Key: YOUR_KEY" \
+      "https://api.shadowcorp.dev/v1/validators"
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    // Get all current validators
+    const getAllValidators = async () => {
+      const response = await fetch(
+        'https://api.shadowcorp.dev/v1/validators',
+        {
+          headers: {
+            'X-API-Key': 'YOUR_KEY'
+          }
+        }
+      );
+      return await response.json();
+    };
+
+    // Get top validators by stake
+    const getTopValidators = async (limit = 10) => {
+      const data = await getAllValidators();
+      return data.current_validators
+        .sort((a, b) => BigInt(b.stake) - BigInt(a.stake))
+        .slice(0, limit);
+    };
+
+    // Calculate total staked amount
+    const getTotalStake = async () => {
+      const data = await getAllValidators();
+      return data.current_validators.reduce(
+        (total, validator) => total + BigInt(validator.stake),
+        BigInt(0)
+      );
+    };
+
+    // Check if specific validator is active
+    const isValidatorActive = async (accountId) => {
+      const data = await getAllValidators();
+      return data.current_validators.some(
+        v => v.account_id === accountId
+      );
+    };
+
+    // Usage
+    const validators = await getAllValidators();
+    console.log(`Total validators: ${validators.current_validators.length}`);
+    console.log(`Current epoch: ${validators.epoch_height}`);
+    
+    const top10 = await getTopValidators(10);
+    console.log('Top 10 validators by stake:', top10);
+    
+    const totalStake = await getTotalStake();
+    console.log(`Total staked: ${totalStake.toString()}`);
+    
+    const isActive = await isValidatorActive('shadowcorp.pool.near');
+    console.log(`ShadowCorp active: ${isActive}`);
+    ```
+  </Tab>
+  
+  <Tab title="Python">
+    ```python
+    import requests
+    from typing import List, Dict, Optional
+
+    class ValidatorsAPI:
+        def __init__(self, api_key: str):
+            self.base_url = 'https://api.shadowcorp.dev'
+            self.headers = {'X-API-Key': api_key}
+        
+        def get_all_validators(self) -> Dict:
+            """Get all current validators"""
+            response = requests.get(
+                f'{self.base_url}/v1/validators',
+                headers=self.headers
+            )
+            return response.json()
+        
+        def get_top_validators(self, limit: int = 10) -> List[Dict]:
+            """Get top validators by stake"""
+            data = self.get_all_validators()
+            validators = data['current_validators']
+            
+            # Sort by stake (descending)
+            sorted_validators = sorted(
+                validators,
+                key=lambda v: int(v['stake']),
+                reverse=True
+            )
+            
+            return sorted_validators[:limit]
+        
+        def get_validator_count(self) -> int:
+            """Get total number of active validators"""
+            data = self.get_all_validators()
+            return len(data['current_validators'])
+        
+        def calculate_total_stake(self) -> int:
+            """Calculate total stake across all validators"""
+            data = self.get_all_validators()
+            return sum(
+                int(v['stake']) 
+                for v in data['current_validators']
+            )
+        
+        def is_validator_active(self, account_id: str) -> bool:
+            """Check if a specific validator is active"""
+            data = self.get_all_validators()
+            return any(
+                v['account_id'] == account_id 
+                for v in data['current_validators']
+            )
+        
+        def get_slashed_validators(self) -> List[Dict]:
+            """Get list of slashed validators"""
+            data = self.get_all_validators()
+            return [
+                v for v in data['current_validators']
+                if v['is_slashed']
+            ]
+        
+        def get_validator_stats(self) -> Dict:
+            """Get aggregate validator statistics"""
+            data = self.get_all_validators()
+            validators = data['current_validators']
+            
+            stakes = [int(v['stake']) for v in validators]
+            
+            return {
+                'total_validators': len(validators),
+                'total_stake': sum(stakes),
+                'average_stake': sum(stakes) // len(stakes) if stakes else 0,
+                'max_stake': max(stakes) if stakes else 0,
+                'min_stake': min(stakes) if stakes else 0,
+                'slashed_count': sum(1 for v in validators if v['is_slashed']),
+                'epoch_height': data['epoch_height'],
+                'epoch_start_height': data['epoch_start_height']
+            }
+
+    # Usage
+    api = ValidatorsAPI('YOUR_KEY')
+    
+    # Get all validators
+    data = api.get_all_validators()
+    print(f"Total validators: {len(data['current_validators'])}")
+    print(f"Current epoch: {data['epoch_height']}")
+    
+    # Top 10 validators
+    top_validators = api.get_top_validators(10)
+    for i, validator in enumerate(top_validators, 1):
+        print(f"{i}. {validator['account_id']}")
+        print(f"   Stake: {validator['stake']}")
+    
+    # Statistics
+    stats = api.get_validator_stats()
+    print(f"\nValidator Statistics:")
+    print(f"  Total validators: {stats['total_validators']}")
+    print(f"  Total stake: {stats['total_stake']}")
+    print(f"  Average stake: {stats['average_stake']}")
+    print(f"  Slashed validators: {stats['slashed_count']}")
+    
+    # Check specific validator
+    is_active = api.is_validator_active('shadowcorp.pool.near')
+    print(f"\nShadowCorp validator active: {is_active}")
+    ```
+  </Tab>
+  
+  <Tab title="Go">
+    ```go
+    package main
+
+    import (
+        "encoding/json"
+        "fmt"
+        "math/big"
+        "net/http"
+        "sort"
+    )
+
+    type ValidatorsClient struct {
+        BaseURL string
+        APIKey  string
+        Client  *http.Client
+    }
+
+    type Validator struct {
+        AccountID string `json:"account_id"`
+        Stake     string `json:"stake"`
+        IsSlashed bool   `json:"is_slashed"`
+    }
+
+    type ValidatorsResponse struct {
+        CurrentValidators []Validator `json:"current_validators"`
+        EpochHeight       int64       `json:"epoch_height"`
+        EpochStartHeight  int64       `json:"epoch_start_height"`
+    }
+
+    func NewValidatorsClient(apiKey string) *ValidatorsClient {
+        return &ValidatorsClient{
+            BaseURL: "https://api.shadowcorp.dev",
+            APIKey:  apiKey,
+            Client:  &http.Client{},
+        }
+    }
+
+    func (c *ValidatorsClient) GetAllValidators() (*ValidatorsResponse, error) {
+        reqURL := fmt.Sprintf("%s/v1/validators", c.BaseURL)
+        
+        req, err := http.NewRequest("GET", reqURL, nil)
+        if err != nil {
+            return nil, err
+        }
+        
+        req.Header.Add("X-API-Key", c.APIKey)
+        
+        resp, err := c.Client.Do(req)
+        if err != nil {
+            return nil, err
+        }
+        defer resp.Body.Close()
+
+        var data ValidatorsResponse
+        if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+            return nil, err
+        }
+        
+        return &data, nil
+    }
+
+    func (c *ValidatorsClient) GetTopValidators(limit int) ([]Validator, error) {
+        data, err := c.GetAllValidators()
+        if err != nil {
+            return nil, err
+        }
+        
+        validators := make([]Validator, len(data.CurrentValidators))
+        copy(validators, data.CurrentValidators)
+        
+        // Sort by stake (descending)
+        sort.Slice(validators, func(i, j int) bool {
+            stakeI := new(big.Int)
+            stakeJ := new(big.Int)
+            stakeI.SetString(validators[i].Stake, 10)
+            stakeJ.SetString(validators[j].Stake, 10)
+            return stakeI.Cmp(stakeJ) > 0
+        })
+        
+        if limit > len(validators) {
+            limit = len(validators)
+        }
+        
+        return validators[:limit], nil
+    }
+
+    func (c *ValidatorsClient) CalculateTotalStake() (*big.Int, error) {
+        data, err := c.GetAllValidators()
+        if err != nil {
+            return nil, err
+        }
+        
+        total := new(big.Int)
+        
+        for _, validator := range data.CurrentValidators {
+            stake := new(big.Int)
+            stake.SetString(validator.Stake, 10)
+            total.Add(total, stake)
+        }
+        
+        return total, nil
+    }
+
+    func (c *ValidatorsClient) IsValidatorActive(accountID string) (bool, error) {
+        data, err := c.GetAllValidators()
+        if err != nil {
+            return false, err
+        }
+        
+        for _, validator := range data.CurrentValidators {
+            if validator.AccountID == accountID {
+                return true, nil
+            }
+        }
+        
+        return false, nil
+    }
+
+    func main() {
+        client := NewValidatorsClient("YOUR_KEY")
+        
+        // Get all validators
+        data, err := client.GetAllValidators()
+        if err != nil {
+            panic(err)
+        }
+        
+        fmt.Printf("Total validators: %d\n", len(data.CurrentValidators))
+        fmt.Printf("Current epoch: %d\n", data.EpochHeight)
+        fmt.Printf("Epoch start height: %d\n", data.EpochStartHeight)
+        
+        // Get top 10 validators
+        top10, err := client.GetTopValidators(10)
+        if err != nil {
+            panic(err)
+        }
+        
+        fmt.Println("\nTop 10 Validators by Stake:")
+        for i, validator := range top10 {
+            fmt.Printf("%d. %s\n", i+1, validator.AccountID)
+            fmt.Printf("   Stake: %s\n", validator.Stake)
+            fmt.Printf("   Slashed: %v\n", validator.IsSlashed)
+        }
+        
+        // Calculate total stake
+        totalStake, err := client.CalculateTotalStake()
+        if err != nil {
+            panic(err)
+        }
+        fmt.Printf("\nTotal stake: %s\n", totalStake.String())
+        
+        // Check specific validator
+        isActive, err := client.IsValidatorActive("shadowcorp.pool.near")
+        if err != nil {
+            panic(err)
+        }
+        fmt.Printf("ShadowCorp validator active: %v\n", isActive)
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Response Format
+
+<ResponseField name="current_validators" type="array" required>
+  Array of all active validators in the current epoch. Each validator object contains:
+  
+  <Expandable title="Validator object">
+    <ResponseField name="account_id" type="string">
+      The validator's pool account ID (e.g., `bisontrails2.poolv1.near`, `shadowcorp.pool.near`)
+    </ResponseField>
+    <ResponseField name="stake" type="string">
+      Total stake amount in yoctoNEAR (10^-24 NEAR). Raw integer without decimals.
+    </ResponseField>
+    <ResponseField name="is_slashed" type="boolean">
+      Whether the validator has been slashed for misbehavior. `true` indicates the validator was penalized.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="epoch_height" type="integer" required>
+  The current epoch number. Epochs are periods during which the validator set remains constant (approximately 12 hours on NEAR mainnet).
+</ResponseField>
+
+<ResponseField name="epoch_start_height" type="integer" required>
+  The block height at which the current epoch started. Used to calculate epoch progress and duration.
+</ResponseField>
+
+### Success Response (200 OK)
+
+```json
+{
+  "current_validators": [
+    {
+      "account_id": "bisontrails2.poolv1.near",
+      "stake": "31443694397391879798613647676853",
+      "is_slashed": false
+    },
+    {
+      "account_id": "astro-stakers.poolv1.near",
+      "stake": "26247324012358739392463595129522",
+      "is_slashed": false
+    },
+    {
+      "account_id": "shadowcorp.pool.near",
+      "stake": "74568895254823223771018781554",
+      "is_slashed": false
+    }
+    // ... 400+ more validators
+  ],
+  "epoch_height": 3929,
+  "epoch_start_height": 179553123
+}
+```
+
+<Check>
+  A `200 OK` status code indicates the validator list was retrieved successfully. The response includes all active validators for the current epoch.
+</Check>
+
+## Understanding NEAR Validators
+
+<AccordionGroup>
+  <Accordion title="What is a Validator?" icon="shield-check">
+    Validators are nodes that secure the NEAR blockchain by:
+    
+    - **Block Production**: Creating new blocks with validated transactions
+    - **Consensus Participation**: Voting on block validity
+    - **Network Security**: Staking NEAR tokens as collateral
+    - **Transaction Validation**: Verifying transaction authenticity
+    
+    **Key Concepts:**
+    - Validators must stake a minimum amount of NEAR tokens
+    - They earn rewards for honest participation
+    - Misbehavior results in slashing (stake penalties)
+    - Validator sets rotate each epoch (~12 hours)
+    
+    ```javascript
+    // Check if a validator is in the active set
+    const validators = await getAllValidators();
+    const myValidator = validators.current_validators.find(
+      v => v.account_id === 'my-validator.poolv1.near'
+    );
+    
+    if (myValidator) {
+      console.log('✅ Validator is active');
+      console.log(`Stake: ${myValidator.stake}`);
+      console.log(`Slashed: ${myValidator.is_slashed ? 'Yes' : 'No'}`);
+    } else {
+      console.log('❌ Validator is not in current epoch');
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Staking & Delegation" icon="coins">
+    NEAR uses a delegated proof-of-stake (DPoS) mechanism:
+    
+    **Validator Pools:**
+    - Validators run staking pools (e.g., `*.poolv1.near`)
+    - Token holders delegate NEAR to validator pools
+    - Rewards are distributed proportionally to delegators
+    - Each pool has its own fee structure
+    
+    **Stake Calculation:**
+    ```javascript
+    // Convert yoctoNEAR to NEAR
+    function yoctoToNear(yocto) {
+      return BigInt(yocto) / BigInt('1000000000000000000000000');
+    }
+    
+    // Get validator stake in NEAR
+    const validator = validators.current_validators[0];
+    const stakeInNear = yoctoToNear(validator.stake);
+    console.log(`${validator.account_id}: ${stakeInNear} NEAR`);
+    
+    // Calculate total network stake
+    const totalStake = validators.current_validators.reduce(
+      (sum, v) => sum + BigInt(v.stake),
+      BigInt(0)
+    );
+    const totalNear = yoctoToNear(totalStake.toString());
+    console.log(`Total staked: ${totalNear} NEAR`);
+    ```
+    
+    <Tip>
+      Stake amounts are in yoctoNEAR (10^-24 NEAR). Always convert to NEAR for human-readable values.
+    </Tip>
+  </Accordion>
+  
+  <Accordion title="Epochs & Validator Rotation" icon="clock-rotate-left">
+    NEAR validators operate in epochs:
+    
+    - **Epoch Duration**: ~12 hours (varies slightly)
+    - **Validator Selection**: Based on stake amount
+    - **Set Size**: Typically 100-300 validators (varies by network demand)
+    - **Rotation**: Validator set can change each epoch
+    
+    ```javascript
+    // Calculate epoch progress
+    async function getEpochProgress() {
+      const validators = await getAllValidators();
+      
+      // Fetch current block height (would need additional API call)
+      // For demonstration, assuming currentHeight is available
+      const currentHeight = 179600000; // example
+      
+      const epochStartHeight = validators.epoch_start_height;
+      const blocksIntoEpoch = currentHeight - epochStartHeight;
+      
+      // Typical epoch length is ~43,200 blocks (12 hours)
+      const estimatedEpochLength = 43200;
+      const progress = (blocksIntoEpoch / estimatedEpochLength) * 100;
+      
+      return {
+        epochHeight: validators.epoch_height,
+        epochStartHeight: epochStartHeight,
+        blocksIntoEpoch: blocksIntoEpoch,
+        progressPercent: Math.min(progress, 100).toFixed(2)
+      };
+    }
+    
+    const progress = await getEpochProgress();
+    console.log(`Epoch ${progress.epochHeight}`);
+    console.log(`Progress: ${progress.progressPercent}%`);
+    console.log(`Blocks into epoch: ${progress.blocksIntoEpoch}`);
+    ```
+  </Accordion>
+  
+  <Accordion title="Slashing & Penalties" icon="triangle-exclamation">
+    Validators can be slashed for misbehavior:
+    
+    **Slashing Conditions:**
+    - Double signing (producing multiple blocks at same height)
+    - Excessive downtime
+    - Invalid state transitions
+    - Network attacks
+    
+    **Consequences:**
+    - Loss of staked NEAR tokens
+    - Removal from validator set
+    - Reputation damage
+    - Delegator fund loss
+    
+    ```javascript
+    // Find slashed validators
+    function getSlashedValidators(validators) {
+      return validators.current_validators.filter(
+        v => v.is_slashed
+      );
+    }
+    
+    // Check slashing rate
+    function calculateSlashingRate(validators) {
+      const total = validators.current_validators.length;
+      const slashed = validators.current_validators.filter(
+        v => v.is_slashed
+      ).length;
+      
+      return {
+        total: total,
+        slashed: slashed,
+        percentage: ((slashed / total) * 100).toFixed(2)
+      };
+    }
+    
+    const data = await getAllValidators();
+    const slashed = getSlashedValidators(data);
+    
+    if (slashed.length > 0) {
+      console.log('⚠️  Slashed validators found:');
+      slashed.forEach(v => {
+        console.log(`  - ${v.account_id}: ${v.stake} stake`);
+      });
+    } else {
+      console.log('✅ No slashed validators in current epoch');
+    }
+    
+    const stats = calculateSlashingRate(data);
+    console.log(`\nSlashing rate: ${stats.percentage}%`);
+    console.log(`(${stats.slashed} of ${stats.total} validators)`);
+    ```
+    
+    <Warning>
+      Slashed validators pose risks to delegators. Always check `is_slashed` status before delegating.
+    </Warning>
+  </Accordion>
+</AccordionGroup>
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Staking Dashboards" icon="chart-mixed" color="#3b82f6">
+    Build comprehensive validator browsing and comparison tools for delegators.
+  </Card>
+  
+  <Card title="Network Monitoring" icon="tower-broadcast" color="#10b981">
+    Track validator performance, stake distribution, and network health metrics.
+  </Card>
+  
+  <Card title="Validator Analytics" icon="chart-line" color="#8b5cf6">
+    Analyze stake concentration, validator diversity, and decentralization metrics.
+  </Card>
+  
+  <Card title="Risk Assessment" icon="shield-exclamation" color="#f59e0b">
+    Monitor slashing events and validator reliability for informed delegation.
+  </Card>
+</CardGroup>
+
+## Advanced Example: Validator Analytics Tool
+
+Here's a complete example of a validator analysis and monitoring system:
+
+```javascript
+class ValidatorAnalytics {
+  constructor(apiKey) {
+    this.apiKey = apiKey;
+    this.baseUrl = 'https://api.shadowcorp.dev';
+  }
+
+  async getAllValidators() {
+    const response = await fetch(
+      `${this.baseUrl}/v1/validators`,
+      {
+        headers: { 'X-API-Key': this.apiKey }
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch validators: ${response.statusText}`);
+    }
+
+    return await response.json();
+  }
+
+  yoctoToNear(yocto) {
+    const divisor = BigInt('1000000000000000000000000');
+    const amount = BigInt(yocto);
+    return Number(amount / divisor) + Number(amount % divisor) / Number(divisor);
+  }
+
+  async getValidatorRankings() {
+    const data = await this.getAllValidators();
+    
+    const ranked = data.current_validators
+      .map(v => ({
+        ...v,
+        stakeNear: this.yoctoToNear(v.stake)
+      }))
+      .sort((a, b) => b.stakeNear - a.stakeNear)
+      .map((v, index) => ({
+        ...v,
+        rank: index + 1
+      }));
+    
+    return ranked;
+  }
+
+  async getNetworkStatistics() {
+    const data = await this.getAllValidators();
+    const validators = data.current_validators;
+    
+    const stakes = validators.map(v => BigInt(v.stake));
+    const totalStake = stakes.reduce((sum, stake) => sum + stake, BigInt(0));
+    const avgStake = totalStake / BigInt(validators.length);
+    
+    const slashedCount = validators.filter(v => v.is_slashed).length;
+    
+    return {
+      totalValidators: validators.length,
+      totalStake: this.yoctoToNear(totalStake.toString()),
+      averageStake: this.yoctoToNear(avgStake.toString()),
+      slashedValidators: slashedCount,
+      slashingRate: ((slashedCount / validators.length) * 100).toFixed(2),
+      epochHeight: data.epoch_height,
+      epochStartHeight: data.epoch_start_height
+    };
+  }
+
+  async getStakeDistribution() {
+    const ranked = await this.getValidatorRankings();
+    const totalStake = ranked.reduce((sum, v) => sum + v.stakeNear, 0);
+    
+    // Calculate stake concentration
+    const top10Stake = ranked.slice(0, 10)
+      .reduce((sum, v) => sum + v.stakeNear, 0);
+    const top50Stake = ranked.slice(0, 50)
+      .reduce((sum, v) => sum + v.stakeNear, 0);
+    
+    return {
+      totalStake: totalStake,
+      top10Percentage: ((top10Stake / totalStake) * 100).toFixed(2),
+      top50Percentage: ((top50Stake / totalStake) * 100).toFixed(2),
+      nakamotoCoefficient: this.calculateNakamoto(ranked, totalStake)
+    };
+  }
+
+  calculateNakamoto(rankedValidators, totalStake) {
+    // Calculate minimum number of validators needed to control >33% of stake
+    let cumulativeStake = 0;
+    let count = 0;
+    const threshold = totalStake * 0.33;
+    
+    for (const validator of rankedValidators) {
+      cumulativeStake += validator.stakeNear;
+      count++;
+      if (cumulativeStake > threshold) {
+        break;
+      }
+    }
+    
+    return count;
+  }
+
+  async findValidator(searchTerm) {
+    const data = await this.getAllValidators();
+    const ranked = await this.getValidatorRankings();
+    
+    const validator = ranked.find(v => 
+      v.account_id.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    
+    if (!validator) {
+      return null;
+    }
+    
+    const totalStake = ranked.reduce((sum, v) => sum + v.stakeNear, 0);
+    const stakePercentage = ((validator.stakeNear / totalStake) * 100).toFixed(4);
+    
+    return {
+      ...validator,
+      stakePercentage: stakePercentage,
+      totalValidators: ranked.length
+    };
+  }
+
+  async generateReport() {
+    console.log('\n' + '='.repeat(70));
+    console.log('NEAR Validator Network Report');
+    console.log('='.repeat(70));
+    
+    const stats = await this.getNetworkStatistics();
+    
+    console.log('\n📊 Network Statistics:');
+    console.log('-'.repeat(70));
+    console.log(`  Total Validators: ${stats.totalValidators}`);
+    console.log(`  Total Stake: ${stats.totalStake.toLocaleString()} NEAR`);
+    console.log(`  Average Stake: ${stats.averageStake.toLocaleString()} NEAR`);
+    console.log(`  Slashed Validators: ${stats.slashedValidators} (${stats.slashingRate}%)`);
+    console.log(`  Current Epoch: ${stats.epochHeight}`);
+    console.log(`  Epoch Start Block: ${stats.epochStartHeight}`);
+    
+    const distribution = await this.getStakeDistribution();
+    
+    console.log('\n🎯 Stake Distribution:');
+    console.log('-'.repeat(70));
+    console.log(`  Top 10 validators control: ${distribution.top10Percentage}%`);
+    console.log(`  Top 50 validators control: ${distribution.top50Percentage}%`);
+    console.log(`  Nakamoto Coefficient: ${distribution.nakamotoCoefficient}`);
+    
+    const top10 = (await this.getValidatorRankings()).slice(0, 10);
+    
+    console.log('\n🏆 Top 10 Validators:');
+    console.log('-'.repeat(70));
+    
+    top10.forEach((v, i) => {
+      const stakeFormatted = v.stakeNear.toLocaleString(undefined, {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      });
+      const accountDisplay = v.account_id.length > 35
+        ? v.account_id.substring(0, 32) + '...'
+        : v.account_id;
+      
+      console.log(`  ${(i + 1).toString().padStart(2)}. ${accountDisplay.padEnd(35)} ${stakeFormatted.padStart(15)} NEAR`);
+    });
+    
+    console.log('='.repeat(70) + '\n');
+    
+    return {
+      stats,
+      distribution,
+      top10
+    };
+  }
+
+  async compareValidators(accountIds) {
+    console.log('\n' + '='.repeat(70));
+    console.log('Validator Comparison');
+    console.log('='.repeat(70));
+    console.log(
+      'Rank'.padEnd(8) +
+      'Validator'.padEnd(40) +
+      'Stake (NEAR)'.padEnd(18) +
+      'Status'
+    );
+    console.log('-'.repeat(70));
+    
+    for (const accountId of accountIds) {
+      const validator = await this.findValidator(accountId);
+      
+      if (!validator) {
+        console.log(`  ❌ ${accountId} - Not found`);
+        continue;
+      }
+      
+      const stakeFormatted = validator.stakeNear.toLocaleString(undefined, {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      });
+      
+      const accountDisplay = accountId.length > 38
+        ? accountId.substring(0, 35) + '...'
+        : accountId;
+      
+      const status = validator.is_slashed ? '🔴 Slashed' : '✅ Active';
+      
+      console.log(
+        `#${validator.rank.toString().padEnd(6)} ` +
+        accountDisplay.padEnd(40) +
+        stakeFormatted.padEnd(18) +
+        status
+      );
+    }
+    
+    console.log('='.repeat(70) + '\n');
+  }
+
+  async monitorChanges(intervalMs = 60000) {
+    console.log(`\n👀 Monitoring validator changes (refresh every ${intervalMs / 1000}s)...`);
+    console.log('Press Ctrl+C to stop\n');
+    
+    let previousCount = null;
+    let previousSlashed = null;
+    
+    const check = async () => {
+      try {
+        const stats = await this.getNetworkStatistics();
+        const timestamp = new Date().toLocaleTimeString();
+        
+        console.log(`[${timestamp}] Validator check:`);
+        console.log(`  Active validators: ${stats.totalValidators}`);
+        console.log(`  Slashed: ${stats.slashedValidators}`);
+        console.log(`  Total stake: ${stats.totalStake.toLocaleString()} NEAR`);
+        
+        // Detect changes
+        if (previousCount !== null && stats.totalValidators !== previousCount) {
+          const change = stats.totalValidators - previousCount;
+          console.log(`  ⚠️  Validator count changed: ${change > 0 ? '+' : ''}${change}`);
+        }
+        
+        if (previousSlashed !== null && stats.slashedValidators !== previousSlashed) {
+          console.log(`  🔴 NEW SLASHING EVENT DETECTED!`);
+        }
+        
+        previousCount = stats.totalValidators;
+        previousSlashed = stats.slashedValidators;
+        
+        console.log();
+      } catch (error) {
+        console.error(`  ❌ Error: ${error.message}\n`);
+      }
+    };
+    
+    // Initial check
+    await check();
+    
+    // Periodic checks
+    return setInterval(check, intervalMs);
+  }
+}
+
+// Usage Examples
+const analytics = new ValidatorAnalytics('YOUR_KEY');
+
+// Generate comprehensive report
+await analytics.generateReport();
+
+// Find specific validator
+const validator = await analytics.findValidator('shadowcorp');
+if (validator) {
+  console.log(`Found: ${validator.account_id}`);
+  console.log(`Rank: #${validator.rank} of ${validator.totalValidators}`);
+  console.log(`Stake: ${validator.stakeNear.toLocaleString()} NEAR`);
+  console.log(`Stake %: ${validator.stakePercentage}%`);
+  console.log(`Status: ${validator.is_slashed ? 'Slashed' : 'Active'}`);
+}
+
+// Compare multiple validators
+await analytics.compareValidators([
+  'shadowcorp.pool.near',
+  'bisontrails2.poolv1.near',
+  'astro-stakers.poolv1.near',
+  'zavodil.poolv1.near'
+]);
+
+// Monitor for changes (updates every minute)
+const monitor = await analytics.monitorChanges(60000);
+
+// Stop monitoring after 10 minutes
+setTimeout(() => {
+  clearInterval(monitor);
+  console.log('Monitoring stopped');
+}, 10 * 60 * 1000);
+```
+
+## Stake Concentration Analysis
+
+Analyze the distribution of stake across validators to assess network decentralization:
+
+```javascript
+async function analyzeStakeConcentration() {
+  const response = await fetch(
+    'https://api.shadowcorp.dev/v1/validators',
+    { headers: { 'X-API-Key': 'YOUR_KEY' } }
+  );
+  const data = await response.json();
+  
+  // Sort validators by stake
+  const sorted = data.current_validators
+    .map(v => ({
+      ...v,
+      stakeBigInt: BigInt(v.stake)
+    }))
+    .sort((a, b) => {
+      if (a.stakeBigInt > b.stakeBigInt) return -1;
+      if (a.stakeBigInt < b.stakeBigInt) return 1;
+      return 0;
+    });
+  
+  // Calculate total stake
+  const totalStake = sorted.reduce(
+    (sum, v) => sum + v.stakeBigInt,
+    BigInt(0)
+  );
+  
+  // Calculate Gini coefficient (measure of inequality)
+  let sumOfDifferences = BigInt(0);
+  for (let i = 0; i < sorted.length; i++) {
+    for (let j = 0; j < sorted.length; j++) {
+      const diff = sorted[i].stakeBigInt > sorted[j].stakeBigInt
+        ? sorted[i].stakeBigInt - sorted[j].stakeBigInt
+        : sorted[j].stakeBigInt - sorted[i].stakeBigInt;
+      sumOfDifferences += diff;
+    }
+  }
+  
+  const n = BigInt(sorted.length);
+  const gini = sumOfDifferences / (BigInt(2) * n * n * totalStake);
+  
+  // Calculate cumulative stake percentages
+  let cumulative = BigInt(0);
+  const milestones = [10, 25, 50, 100];
+  const distribution = {};
+  
+  for (let i = 0; i < sorted.length; i++) {
+    cumulative += sorted[i].stakeBigInt;
+    
+    for (const milestone of milestones) {
+      if (i + 1 === milestone && !distribution[`top${milestone}`]) {
+        const percentage = (Number(cumulative * BigInt(10000) / totalStake) / 100).toFixed(2);
+        distribution[`top${milestone}`] = percentage;
+      }
+    }
+  }
+  
+  return {
+    totalValidators: sorted.length,
+    giniCoefficient: Number(gini) / 1000000, // Normalize
+    distribution: distribution,
+    validators: sorted
+  };
+}
+
+// Usage
+const analysis = await analyzeStakeConcentration();
+console.log('Stake Concentration Analysis:');
+console.log(`Total validators: ${analysis.totalValidators}`);
+console.log(`Gini coefficient: ${analysis.giniCoefficient.toFixed(4)}`);
+console.log('\nStake Distribution:');
+console.log(`Top 10 validators: ${analysis.distribution.top10}%`);
+console.log(`Top 25 validators: ${analysis.distribution.top25}%`);
+console.log(`Top 50 validators: ${analysis.distribution.top50}%`);
+console.log(`Top 100 validators: ${analysis.distribution.top100}%`);
+```
+
+## Error Responses
+
+### 401 Unauthorized
+
+```json
+{
+  "error": "Missing or invalid API key",
+  "code": 401
+}
+```
+
+### 500 Internal Server Error
+
+```json
+{
+  "error": "Failed to fetch validators",
+  "code": 500
+}
+```
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+  <Card 
+    title="Validator Pool Info" 
+    icon="circle-info" 
+    href="/shadow-api/endpoints/validator-pool-info"
+  >
+    Get detailed information about a specific validator pool
+  </Card>
+  
+  <Card 
+    title="Account Staking" 
+    icon="piggy-bank" 
+    href="/shadow-api/endpoints/account-stakings"
+  >
+    Check staking balance for an account in a validator pool
+  </Card>
+  
+  <Card 
+    title="Network Stats" 
+    icon="chart-simple" 
+    href="/shadow-api/endpoints/stats"
+  >
+    Get overall NEAR network statistics
+  </Card>
+  
+  <Card 
+    title="Blocks" 
+    icon="cube" 
+    href="/shadow-api/endpoints/blocks"
+  >
+    View blocks produced by validators
+  </Card>
+</CardGroup>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Caching Strategy" icon="database">
+    Validator data changes only at epoch boundaries (~12 hours). Implement smart caching:
+    
+    ```javascript
+    class ValidatorCache {
+      constructor(apiKey) {
+        this.apiKey = apiKey;
+        this.cache = null;
+        this.cacheExpiry = null;
+        this.epochDuration = 12 * 60 * 60 * 1000; // 12 hours in ms
+      }
+      
+      async getValidators(forceRefresh = false) {
+        const now = Date.now();
+        
+        // Check if cache is valid
+        if (!forceRefresh && this.cache && this.cacheExpiry > now) {
+          console.log('✅ Using cached validator data');
+          return this.cache;
+        }
+        
+        console.log('🔄 Fetching fresh validator data...');
+        const response = await fetch(
+          'https://api.shadowcorp.dev/v1/validators',
+          { headers: { 'X-API-Key': this.apiKey } }
+        );
+        
+        const data = await response.json();
+        
+        // Cache until next epoch (approximately)
+        this.cache = data;
+        this.cacheExpiry = now + this.epochDuration;
+        
+        return data;
+      }
+      
+      clearCache() {
+        this.cache = null;
+        this.cacheExpiry = null;
+        console.log('🗑️  Cache cleared');
+      }
+    }
+    
+    // Usage
+    const cache = new ValidatorCache('YOUR_KEY');
+    
+    // First call - fetches from API
+    const validators1 = await cache.getValidators();
+    
+    // Second call - uses cache
+    const validators2 = await cache.getValidators();
+    
+    // Force refresh
+    const validators3 = await cache.getValidators(true);
+    ```
+  </Accordion>
+  
+  <Accordion title="Stake Calculations" icon="calculator">
+    Always use BigInt for stake calculations to avoid precision loss:
+    
+    ```javascript
+    // ❌ WRONG - loses precision
+    function wrongConversion(yoctoNear) {
+      return parseInt(yoctoNear) / 1e24;
+    }
+    
+    // ✅ CORRECT - maintains precision
+    function correctConversion(yoctoNear) {
+      const amount = BigInt(yoctoNear);
+      const divisor = BigInt('1000000000000000000000000');
+      
+      const whole = amount / divisor;
+      const fraction = amount % divisor;
+      
+      return Number(whole) + Number(fraction) / Number(divisor);
+    }
+    
+    // Safe comparison
+    function compareStakes(stake1, stake2) {
+      const a = BigInt(stake1);
+      const b = BigInt(stake2);
+      
+      if (a > b) return 1;
+      if (a < b) return -1;
+      return 0;
+    }
+    
+    // Calculate percentage
+    function calculateStakePercentage(validatorStake, totalStake) {
+      const stake = BigInt(validatorStake);
+      const total = BigInt(totalStake);
+      
+      // Multiply by 10000 to get 2 decimal precision
+      const percentage = (stake * BigInt(10000)) / total;
+      
+      return Number(percentage) / 100;
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Error Handling" icon="shield-halved">
+    Implement robust error handling for production applications:
+    
+    ```javascript
+    async function safeGetValidators(apiKey, retries = 3) {
+      for (let attempt = 1; attempt <= retries; attempt++) {
+        try {
+          const response = await fetch(
+            'https://api.shadowcorp.dev/v1/validators',
+            {
+              headers: { 'X-API-Key': apiKey },
+              signal: AbortSignal.timeout(15000) // 15s timeout
+            }
+          );
+          
+          if (!response.ok) {
+            if (response.status === 401) {
+              throw new Error('Invalid API key - check your credentials');
+            }
+            
+            if (response.status === 429) {
+              const retryAfter = response.headers.get('Retry-After');
+              const delay = retryAfter ? parseInt(retryAfter) * 1000 : 5000;
+              
+              if (attempt < retries) {
+                console.log(`Rate limited. Retrying after ${delay}ms...`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+                continue;
+              }
+              
+              throw new Error('Rate limit exceeded');
+            }
+            
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+          
+          const data = await response.json();
+          
+          // Validate response structure
+          if (!data.current_validators || !Array.isArray(data.current_validators)) {
+            throw new Error('Invalid response format');
+          }
+          
+          return {
+            success: true,
+            data: data,
+            error: null
+          };
+          
+        } catch (error) {
+          if (error.name === 'TimeoutError') {
+            console.error(`Attempt ${attempt}/${retries}: Request timeout`);
+          } else {
+            console.error(`Attempt ${attempt}/${retries}: ${error.message}`);
+          }
+          
+          // Last attempt failed
+          if (attempt === retries) {
+            return {
+              success: false,
+              data: null,
+              error: error.message
+            };
+          }
+          
+          // Exponential backoff
+          const backoff = Math.pow(2, attempt - 1) * 1000;
+          await new Promise(resolve => setTimeout(resolve, backoff));
+        }
+      }
+    }
+    
+    // Usage
+    const result = await safeGetValidators('YOUR_KEY');
+    
+    if (result.success) {
+      console.log(`Loaded ${result.data.current_validators.length} validators`);
+    } else {
+      console.error(`Failed to load validators: ${result.error}`);
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Performance Optimization" icon="gauge-high">
+    Optimize processing of large validator datasets:
+    
+    ```javascript
+    class OptimizedValidatorProcessor {
+      constructor(apiKey) {
+        this.apiKey = apiKey;
+      }
+      
+      async getValidators() {
+        const response = await fetch(
+          'https://api.shadowcorp.dev/v1/validators',
+          { headers: { 'X-API-Key': this.apiKey } }
+        );
+        return await response.json();
+      }
+      
+      // Use Map for O(1) lookups
+      createValidatorMap(validators) {
+        const map = new Map();
+        
+        for (const validator of validators) {
+          map.set(validator.account_id, validator);
+        }
+        
+        return map;
+      }
+      
+      // Lazy evaluation for large datasets
+      *filterValidators(validators, predicate) {
+        for (const validator of validators) {
+          if (predicate(validator)) {
+            yield validator;
+          }
+        }
+      }
+      
+      // Efficient top-N selection without full sort
+      getTopN(validators, n, compareFn) {
+        // Use a min-heap for large N
+        if (n > validators.length / 2) {
+          return validators
+            .sort(compareFn)
+            .slice(0, n);
+        }
+        
+        // For small N, use selection algorithm
+        const result = [];
+        const remaining = [...validators];
+        
+        for (let i = 0; i < n && remaining.length > 0; i++) {
+          let maxIdx = 0;
+          let maxVal = remaining[0];
+          
+          for (let j = 1; j < remaining.length; j++) {
+            if (compareFn(remaining[j], maxVal) < 0) {
+              maxIdx = j;
+              maxVal = remaining[j];
+            }
+          }
+          
+          result.push(maxVal);
+          remaining.splice(maxIdx, 1);
+        }
+        
+        return result;
+      }
+      
+      // Parallel processing for multiple queries
+      async batchProcess(accountIds) {
+        const data = await this.getValidators();
+        const validatorMap = this.createValidatorMap(data.current_validators);
+        
+        // Process all lookups in parallel
+        return accountIds.map(id => validatorMap.get(id));
+      }
+    }
+    
+    // Usage
+    const processor = new OptimizedValidatorProcessor('YOUR_KEY');
+    
+    // Efficient top-10 selection
+    const data = await processor.getValidators();
+    const top10 = processor.getTopN(
+      data.current_validators,
+      10,
+      (a, b) => BigInt(b.stake) > BigInt(a.stake) ? -1 : 1
+    );
+    
+    // Lazy filtering for large datasets
+    const largeValidators = processor.filterValidators(
+      data.current_validators,
+      v => BigInt(v.stake) > BigInt('1000000000000000000000000000')
+    );
+    
+    for (const validator of largeValidators) {
+      console.log(validator.account_id);
+      // Process one at a time without loading all into memory
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Integration Examples
+
+<Tabs>
+  <Tab title="React Component">
+    ```typescript
+    import { useState, useEffect } from 'react';
+    
+    interface Validator {
+      account_id: string;
+      stake: string;
+      is_slashed: boolean;
+    }
+    
+    interface ValidatorsData {
+      current_validators: Validator[];
+      epoch_height: number;
+      epoch_start_height: number;
+    }
+    
+    export function useValidators(apiKey: string) {
+      const [validators, setValidators] = useState<ValidatorsData | null>(null);
+      const [loading, setLoading] = useState(true);
+      const [error, setError] = useState<string | null>(null);
+      
+      useEffect(() => {
+        let mounted = true;
+        
+        async function fetchValidators() {
+          try {
+            setLoading(true);
+            const response = await fetch(
+              'https://api.shadowcorp.dev/v1/validators',
+              {
+                headers: { 'X-API-Key': apiKey }
+              }
+            );
+            
+            if (!response.ok) {
+              throw new Error(`HTTP ${response.status}`);
+            }
+            
+            const data = await response.json();
+            
+            if (mounted) {
+              setValidators(data);
+              setError(null);
+            }
+          } catch (err) {
+            if (mounted) {
+              setError(err instanceof Error ? err.message : 'Unknown error');
+            }
+          } finally {
+            if (mounted) {
+              setLoading(false);
+            }
+          }
+        }
+        
+        fetchValidators();
+        
+        return () => {
+          mounted = false;
+        };
+      }, [apiKey]);
+      
+      return { validators, loading, error };
+    }
+    
+    // Usage in component
+    function ValidatorsList({ apiKey }: { apiKey: string }) {
+      const { validators, loading, error } = useValidators(apiKey);
+      
+      if (loading) return <div>Loading validators...</div>;
+      if (error) return <div>Error: {error}</div>;
+      if (!validators) return null;
+      
+      return (
+        <div>
+          <h2>NEAR Validators (Epoch {validators.epoch_height})</h2>
+          <p>Total: {validators.current_validators.length} validators</p>
+          
+          <ul>
+            {validators.current_validators.slice(0, 10).map(v => (
+              <li key={v.account_id}>
+                {v.account_id} - {v.is_slashed ? '🔴' : '✅'}
+              </li>
+            ))}
+          </ul>
+        </div>
+      );
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Vue Component">
+    ```vue
+    <template>
+      <div v-if="loading">Loading validators...</div>
+      <div v-else-if="error">Error: {{ error }}</div>
+      <div v-else-if="validators">
+        <h2>NEAR Validators (Epoch {{ validators.epoch_height }})</h2>
+        <p>Total: {{ validators.current_validators.length }} validators</p>
+        
+        <ul>
+          <li v-for="validator in topValidators" :key="validator.account_id">
+            {{ validator.account_id }} - {{ validator.is_slashed ? '🔴' : '✅' }}
+          </li>
+        </ul>
+      </div>
+    </template>
+    
+    <script setup>
+    import { ref, computed, onMounted } from 'vue';
+    
+    const props = defineProps({
+      apiKey: String
+    });
+    
+    const validators = ref(null);
+    const loading = ref(true);
+    const error = ref(null);
+    
+    const topValidators = computed(() => {
+      if (!validators.value) return [];
+      return validators.value.current_validators.slice(0, 10);
+    });
+    
+    onMounted(async () => {
+      try {
+        const response = await fetch(
+          'https://api.shadowcorp.dev/v1/validators',
+          {
+            headers: { 'X-API-Key': props.apiKey }
+          }
+        );
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        
+        validators.value = await response.json();
+      } catch (err) {
+        error.value = err.message;
+      } finally {
+        loading.value = false;
+      }
+    });
+    </script>
+    ```
+  </Tab>
+</Tabs>
+
+## Notes
+
+<Info>
+  **Epoch Duration**: Epochs last approximately 12 hours on NEAR mainnet. Validator sets remain constant throughout an epoch.
+</Info>
+
+<Warning>
+  **Stake Precision**: All stake values are in yoctoNEAR (10^-24 NEAR). Use BigInt for calculations to avoid precision loss with large numbers.
+</Warning>
+
+<Tip>
+  **Caching**: Validator data changes only at epoch boundaries. Cache responses for up to 12 hours to reduce API calls.
+</Tip>
+
+<Note>
+  **Slashing**: The `is_slashed` field indicates validators that have been penalized. Always check this before delegating stake.
+</Note>

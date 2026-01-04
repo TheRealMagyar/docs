@@ -1,0 +1,419 @@
+---
+title: "Blocks"
+description: "Query NEAR blockchain blocks by height or list blocks with pagination. Blocks contain all transactions and state changes that occurred at a specific point in the blockchain."
+icon: cube
+---
+
+import { Callout } from '@/components/ui/callout'
+
+## Get Block by Height
+
+Retrieve detailed information about a specific block using its height.
+
+```typescript
+import { ShadowCorpSDK } from 'shadowcorp';
+
+const sdk = new ShadowCorpSDK('your-api-key');
+
+const block = await sdk.blocks.getByHeight(178978873);
+console.log(block);
+```
+
+### Flexible Height Parameter
+
+The height parameter accepts both numbers and strings:
+
+```typescript
+// As a number
+const block1 = await sdk.blocks.getByHeight(178978873);
+
+// As a string
+const block2 = await sdk.blocks.getByHeight('178978873');
+```
+
+### Error Handling
+
+```typescript
+try {
+  const block = await sdk.blocks.getByHeight(999999999999);
+} catch (error) {
+  if (error.message.includes('not found')) {
+    console.log('Block does not exist yet');
+  } else {
+    console.error('Query failed:', error);
+  }
+}
+```
+
+## List Blocks
+
+List blocks with pagination to browse the blockchain sequentially.
+
+```typescript
+const blocks = await sdk.blocks.list({ 
+  limit: 10, 
+  offset: 0 
+});
+console.log(blocks);
+```
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `limit` | `number` | No | Number of blocks to return (default: 50, max: 100) |
+| `offset` | `number` | No | Number of blocks to skip for pagination |
+| `from_height` | `number` | No | Starting block height (inclusive) |
+| `to_height` | `number` | No | Ending block height (inclusive) |
+
+<Callout type="info">
+Blocks are returned in descending order by default (newest first). Use `from_height` and `to_height` to query specific block ranges.
+</Callout>
+
+### List Recent Blocks
+
+```typescript
+// Get the 10 most recent blocks
+const recentBlocks = await sdk.blocks.list({ 
+  limit: 10 
+});
+
+recentBlocks.forEach(block => {
+  console.log(`Block ${block.block_height}: ${block.block_timestamp}`);
+});
+```
+
+### Query Block Range
+
+```typescript
+// Get blocks from a specific range
+const rangeBlocks = await sdk.blocks.list({
+  from_height: 178978800,
+  to_height: 178978900,
+  limit: 100
+});
+
+console.log(`Retrieved ${rangeBlocks.length} blocks`);
+```
+
+## Block Response Structure
+
+A typical block object contains:
+
+```typescript
+{
+  block_height: number;               // Block height/number
+  block_hash: string;                 // Unique block identifier
+  block_timestamp: string;            // ISO 8601 timestamp
+  prev_block_hash: string;            // Hash of the previous block
+  total_supply: string;               // Total NEAR supply at this block
+  gas_price: string;                  // Gas price in yoctoNEAR
+  author_account_id: string;          // Validator that produced the block
+  transactions_count: number;         // Number of transactions in this block
+  chunks: Array<{                     // Block chunks (shards)
+    chunk_hash: string;
+    shard_id: number;
+  }>;
+}
+```
+
+### Example Block Response
+
+```json
+{
+  "block_height": 178978873,
+  "block_hash": "6Zgh8ZQgKMN4L3xK8WqTNNKTELNJxNQJK8WqTNNKTELN",
+  "block_timestamp": "2025-12-30T15:23:45.123456Z",
+  "prev_block_hash": "5Ygh7YPhJLM3K2wJ7VpSMMJSKDMJKwMLJ7VpSMMJSKDM",
+  "total_supply": "1087654321098765432109876543",
+  "gas_price": "100000000",
+  "author_account_id": "validator.poolv1.near",
+  "transactions_count": 42,
+  "chunks": [
+    {
+      "chunk_hash": "AbCdEf1234567890",
+      "shard_id": 0
+    }
+  ]
+}
+```
+
+## Use Cases
+
+### Block Explorer
+
+Build a simple block explorer interface:
+
+```typescript
+async function exploreBlocks(startHeight: number, count: number = 10) {
+  const blocks = await sdk.blocks.list({
+    from_height: startHeight,
+    limit: count
+  });
+  
+  for (const block of blocks) {
+    console.log(`
+Block #${block.block_height}
+Hash: ${block.block_hash}
+Time: ${new Date(block.block_timestamp).toLocaleString()}
+Validator: ${block.author_account_id}
+Transactions: ${block.transactions_count}
+    `.trim());
+  }
+}
+
+await exploreBlocks(178978873);
+```
+
+### Calculate Block Time
+
+Determine average block production time:
+
+```typescript
+async function calculateBlockTime() {
+  const blocks = await sdk.blocks.list({ limit: 100 });
+  
+  if (blocks.length < 2) return null;
+  
+  const times = blocks.map(b => new Date(b.block_timestamp).getTime());
+  const differences = [];
+  
+  for (let i = 0; i < times.length - 1; i++) {
+    differences.push(Math.abs(times[i] - times[i + 1]));
+  }
+  
+  const avgMs = differences.reduce((a, b) => a + b, 0) / differences.length;
+  const avgSeconds = avgMs / 1000;
+  
+  return {
+    averageBlockTime: `${avgSeconds.toFixed(2)}s`,
+    blocksPerMinute: (60 / avgSeconds).toFixed(2),
+    blocksPerHour: Math.round(3600 / avgSeconds)
+  };
+}
+
+const blockStats = await calculateBlockTime();
+console.log(blockStats);
+// { averageBlockTime: '1.23s', blocksPerMinute: '48.78', blocksPerHour: 2927 }
+```
+
+### Monitor Specific Block
+
+Wait for and retrieve a specific block when it's produced:
+
+```typescript
+async function waitForBlock(targetHeight: number) {
+  console.log(`Waiting for block ${targetHeight}...`);
+  
+  while (true) {
+    try {
+      const block = await sdk.blocks.getByHeight(targetHeight);
+      console.log(`Block ${targetHeight} found!`);
+      return block;
+    } catch (error) {
+      // Block not yet produced, wait and retry
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+  }
+}
+
+const futureBlock = await waitForBlock(179000000);
+```
+
+### Analyze Validator Activity
+
+Track which validators are producing blocks:
+
+```typescript
+async function analyzeValidators(blockCount: number = 100) {
+  const blocks = await sdk.blocks.list({ limit: blockCount });
+  
+  const validatorCounts = new Map<string, number>();
+  
+  for (const block of blocks) {
+    const count = validatorCounts.get(block.author_account_id) || 0;
+    validatorCounts.set(block.author_account_id, count + 1);
+  }
+  
+  const sorted = Array.from(validatorCounts.entries())
+    .sort((a, b) => b[1] - a[1]);
+  
+  console.log(`Validator activity (last ${blockCount} blocks):`);
+  sorted.forEach(([validator, count]) => {
+    const percentage = ((count / blockCount) * 100).toFixed(2);
+    console.log(`${validator}: ${count} blocks (${percentage}%)`);
+  });
+  
+  return sorted;
+}
+
+await analyzeValidators(1000);
+```
+
+### Pagination Through History
+
+Efficiently paginate through blockchain history:
+
+```typescript
+async function* paginateBlocks(startHeight?: number) {
+  let offset = 0;
+  const limit = 100;
+  
+  while (true) {
+    const params: any = { limit, offset };
+    if (startHeight) {
+      params.from_height = startHeight;
+    }
+    
+    const blocks = await sdk.blocks.list(params);
+    
+    if (blocks.length === 0) break;
+    
+    yield blocks;
+    
+    if (blocks.length < limit) break;
+    offset += limit;
+  }
+}
+
+// Usage
+for await (const blockBatch of paginateBlocks(178978000)) {
+  console.log(`Processing ${blockBatch.length} blocks`);
+  // Process batch
+}
+```
+
+### Find Block by Timestamp
+
+Find the block closest to a specific timestamp:
+
+```typescript
+async function findBlockByTimestamp(targetTime: Date) {
+  const stats = await sdk.stats.getNetworkStats();
+  const latestBlock = stats.latest_block_height;
+  
+  // Binary search for the closest block
+  let low = 0;
+  let high = latestBlock;
+  let closest = null;
+  let closestDiff = Infinity;
+  
+  while (low <= high) {
+    const mid = Math.floor((low + high) / 2);
+    const block = await sdk.blocks.getByHeight(mid);
+    const blockTime = new Date(block.block_timestamp);
+    const diff = Math.abs(blockTime.getTime() - targetTime.getTime());
+    
+    if (diff < closestDiff) {
+      closestDiff = diff;
+      closest = block;
+    }
+    
+    if (blockTime < targetTime) {
+      low = mid + 1;
+    } else {
+      high = mid - 1;
+    }
+  }
+  
+  return closest;
+}
+
+const targetDate = new Date('2025-12-25T00:00:00Z');
+const block = await findBlockByTimestamp(targetDate);
+console.log(`Closest block: ${block.block_height}`);
+```
+
+## Understanding Block Data
+
+### Block Height
+
+Block height (also called block number) is a sequential counter that increases by 1 for each new block. NEAR produces blocks approximately every 1-2 seconds.
+
+### Block Hash
+
+Each block has a unique cryptographic hash that serves as its identifier. The `prev_block_hash` links to the previous block, forming the blockchain.
+
+### Chunks and Shards
+
+NEAR uses sharding for scalability. Each block contains multiple chunks, one for each shard. Transactions are distributed across shards for parallel processing.
+
+### Total Supply
+
+The `total_supply` field shows the total amount of NEAR tokens in circulation at the time of this block, expressed in yoctoNEAR (1 NEAR = 10²⁴ yoctoNEAR).
+
+### Gas Price
+
+The `gas_price` indicates the cost per unit of gas for transactions in this block, also in yoctoNEAR.
+
+## Best Practices
+
+### Efficient Range Queries
+
+<Callout type="tip">
+When querying large block ranges, use `from_height` and `to_height` parameters instead of offset-based pagination for better performance.
+</Callout>
+
+```typescript
+// ❌ Less efficient - offset pagination
+const blocks = await sdk.blocks.list({ 
+  offset: 10000, 
+  limit: 100 
+});
+
+// ✅ More efficient - height-based range
+const blocks = await sdk.blocks.list({ 
+  from_height: 178970000, 
+  to_height: 178970100 
+});
+```
+
+### Caching Recent Blocks
+
+Cache recent blocks to avoid repeated API calls:
+
+```typescript
+class BlockCache {
+  private cache = new Map<number, any>();
+  private maxSize = 1000;
+  
+  async getBlock(height: number) {
+    if (this.cache.has(height)) {
+      return this.cache.get(height);
+    }
+    
+    const block = await sdk.blocks.getByHeight(height);
+    
+    if (this.cache.size >= this.maxSize) {
+      const firstKey = this.cache.keys().next().value;
+      this.cache.delete(firstKey);
+    }
+    
+    this.cache.set(height, block);
+    return block;
+  }
+}
+
+const cache = new BlockCache();
+const block = await cache.getBlock(178978873);
+```
+
+### Error Handling for Future Blocks
+
+<Callout type="warning">
+Attempting to fetch blocks that haven't been produced yet will result in errors. Always check against the latest block height first.
+</Callout>
+
+```typescript
+async function safeGetBlock(height: number) {
+  const stats = await sdk.stats.getNetworkStats();
+  
+  if (height > stats.latest_block_height) {
+    throw new Error(`Block ${height} hasn't been produced yet. Latest: ${stats.latest_block_height}`);
+  }
+  
+  return await sdk.blocks.getByHeight(height);
+}
+```
+
+For support: [support@shadowcorp.dev](mailto:support@shadowcorp.dev)

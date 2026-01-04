@@ -1,0 +1,290 @@
+---
+title: "Health & Directory"
+description: "The ShadowCorp SDK provides health monitoring and service discovery endpoints to verify API connectivity and explore available resources."
+icon: heart-pulse
+---
+
+import { Callout } from '@/components/ui/callout'
+import { CodeGroup } from '@/components/ui/code-group'
+
+## Health Check
+
+Verify that the API is operational and your connection is working properly.
+
+```typescript
+import { ShadowCorpSDK } from 'shadowcorp';
+
+const sdk = new ShadowCorpSDK('your-api-key');
+
+const health = await sdk.health.check();
+console.log(health);
+```
+
+**Response:**
+
+```json
+{
+  "status": "OK"
+}
+```
+
+<Callout type="info">
+The health check endpoint does not require authentication and is useful for monitoring and debugging connection issues.
+</Callout>
+
+## API Directory
+
+Discover all available endpoints, their authentication requirements, and supported parameters.
+
+```typescript
+import { ShadowCorpSDK } from 'shadowcorp';
+
+const sdk = new ShadowCorpSDK('your-api-key');
+
+const endpoints = await sdk.health.directory();
+console.log(endpoints);
+```
+
+**Response:**
+
+```json
+{
+  "name": "ShadowCorp NEAR Blockchain API",
+  "version": "1.0",
+  "base_url": "https://api.shadowcorp.dev",
+  "authentication": {
+    "type": "API Key",
+    "header": "X-API-Key",
+    "required": true,
+    "note": "All endpoints except /health and / require authentication"
+  },
+  "pagination": {
+    "params": ["limit", "offset"],
+    "default_limit": 50,
+    "max_limit": 100
+  },
+  "endpoints": [
+    {
+      "method": "GET",
+      "path": "/health",
+      "description": "Health check",
+      "auth": false
+    },
+    {
+      "method": "GET",
+      "path": "/",
+      "description": "API directory (this endpoint)",
+      "auth": false
+    },
+    {
+      "method": "GET",
+      "path": "/v1/stats",
+      "description": "Network statistics"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/blocks",
+      "description": "List blocks",
+      "params": ["limit", "offset", "from_height", "to_height"]
+    },
+    {
+      "method": "GET",
+      "path": "/v1/blocks/:height",
+      "description": "Get block by height"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/transactions",
+      "description": "List transactions",
+      "params": ["limit", "offset", "account_id", "from_block", "to_block"]
+    },
+    {
+      "method": "GET",
+      "path": "/v1/transactions/:hash",
+      "description": "Get transaction by hash"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/transactions",
+      "description": "Batch lookup transactions",
+      "body": {
+        "hashes": ["array of transaction hashes"]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/v1/ft-transfers",
+      "description": "List FT transfers",
+      "params": ["limit", "offset", "account_id", "token_id"]
+    },
+    {
+      "method": "GET",
+      "path": "/v1/nft-transfers",
+      "description": "List NFT transfers",
+      "params": ["limit", "offset", "account_id", "contract_id"]
+    },
+    {
+      "method": "GET",
+      "path": "/v1/tokens/:id/holders",
+      "description": "Top token holders"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/tokens/:id/metadata",
+      "description": "Token metadata"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/nfts/:id/metadata",
+      "description": "NFT collection metadata"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/accounts/:id",
+      "description": "Full account data (balance, tokens, NFTs, staking, labels, risk)"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/accounts/:id/balance",
+      "description": "Native NEAR balance only"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/accounts/:id/staking",
+      "description": "Staking balance in pool",
+      "params": ["pool_id"]
+    },
+    {
+      "method": "GET",
+      "path": "/v1/accounts/:id/burrow",
+      "description": "Burrow DeFi positions"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/validators",
+      "description": "All current validators"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/validators/:pool",
+      "description": "Validator pool info"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/alerts",
+      "description": "Anomaly alerts",
+      "params": ["limit", "offset", "severity", "type"]
+    },
+    {
+      "method": "POST",
+      "path": "/v1/rpc",
+      "description": "RPC proxy (JSON-RPC 2.0)",
+      "body": {
+        "jsonrpc": "2.0",
+        "method": "string",
+        "params": {},
+        "id": "number"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/v1/rpc/batch",
+      "description": "Batch RPC requests"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/graph",
+      "description": "Neo4j Cypher queries (read-only)",
+      "body": {
+        "query": "MATCH (n) RETURN n LIMIT 10"
+      }
+    }
+  ]
+}
+```
+
+## Understanding the Directory Response
+
+The directory response contains comprehensive metadata about the API:
+
+### Authentication
+
+```json
+{
+  "type": "API Key",
+  "header": "X-API-Key",
+  "required": true,
+  "note": "All endpoints except /health and / require authentication"
+}
+```
+
+Most endpoints require your API key. Only `/health` and `/` (directory) are publicly accessible.
+
+### Pagination
+
+```json
+{
+  "params": ["limit", "offset"],
+  "default_limit": 50,
+  "max_limit": 100
+}
+```
+
+List endpoints support pagination with:
+- `limit`: Number of results (default: 50, max: 100)
+- `offset`: Skip this many results
+
+### Endpoint Metadata
+
+Each endpoint includes:
+- **method**: HTTP method (GET, POST)
+- **path**: URL path with parameter placeholders (`:id`, `:height`, etc.)
+- **description**: Human-readable purpose
+- **auth**: Whether authentication is required (defaults to `true` if omitted)
+- **params**: Available query parameters (for GET requests)
+- **body**: Expected request body structure (for POST requests)
+
+## Use Cases
+
+### Service Discovery
+
+Use the directory to programmatically discover available endpoints:
+
+```typescript
+const { endpoints } = await sdk.health.directory();
+
+// Find all GET endpoints
+const getEndpoints = endpoints.filter(e => e.method === 'GET');
+
+// Find endpoints that don't require auth
+const publicEndpoints = endpoints.filter(e => e.auth === false);
+
+// Find all account-related endpoints
+const accountEndpoints = endpoints.filter(e => 
+  e.path.includes('/accounts/')
+);
+```
+
+### Monitoring & Alerting
+
+Set up health checks for monitoring:
+
+```typescript
+async function monitorAPI() {
+  try {
+    const health = await sdk.health.check();
+    if (health.status !== 'OK') {
+      console.error('API health check failed');
+      // Send alert
+    }
+  } catch (error) {
+    console.error('API unreachable:', error);
+    // Send alert
+  }
+}
+
+// Check every 60 seconds
+setInterval(monitorAPI, 60000);
+```
+
+For support: [support@shadowcorp.dev](mailto:support@shadowcorp.dev)

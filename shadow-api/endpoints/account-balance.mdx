@@ -1,0 +1,1262 @@
+---
+title: Account Balance
+description: Query native NEAR token balances for any account. Get available, locked, and storage information in a lightweight endpoint optimized for real-time balance checks.
+icon: wallet
+---
+
+import { Endpoint, Request } from '@mintlify/components';
+
+## Get Account Balance
+
+<Endpoint method="GET" path="/v1/accounts/:id/balance" />
+
+Retrieve the native NEAR balance for any account, including available balance, locked funds, storage usage, and contract deployment status. This lightweight endpoint is optimized for frequent balance checks and real-time updates.
+
+<Info>
+  This endpoint returns only balance-related data. For comprehensive account information including tokens, NFTs, and staking, use the [full account data endpoint](/endpoints/full-account-data).
+</Info>
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  The NEAR account ID to query. Can be a named account or implicit account.
+  
+  **Examples:**
+  - `example.near` - Named account
+  - `alice.near` - User account
+  - `wrap.near` - Token contract
+  - `pool.near` - Validator pool
+  - `98793cd91a3f870fb126f66285808c7e094afcfc4eda8a970f6648cdf0dbd6de` - Implicit account
+</ParamField>
+
+### Making Requests
+
+<Tabs>
+  <Tab title="cURL">
+    **Get account balance:**
+    ```bash
+    curl -H "X-API-Key: YOUR_KEY" \
+      "https://api.shadowcorp.dev/v1/accounts/therealmagyar.near/balance"
+    ```
+
+    **Check multiple accounts:**
+    ```bash
+    # Query multiple balances sequentially
+    for account in alice.near bob.near charlie.near; do
+      echo "Balance for $account:"
+      curl -H "X-API-Key: YOUR_KEY" \
+        "https://api.shadowcorp.dev/v1/accounts/$account/balance"
+      echo ""
+    done
+    ```
+
+    **Monitor balance changes:**
+    ```bash
+    # Check balance every 10 seconds
+    watch -n 10 'curl -s -H "X-API-Key: YOUR_KEY" \
+      "https://api.shadowcorp.dev/v1/accounts/alice.near/balance"'
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    // Helper function to convert yoctoNEAR to NEAR
+    const yoctoToNear = (yoctoAmount) => {
+      const amount = BigInt(yoctoAmount);
+      const nearAmount = Number(amount) / 1e24;
+      return nearAmount.toFixed(6);
+    };
+
+    // Get account balance
+    const getBalance = async (accountId) => {
+      const response = await fetch(
+        `https://api.shadowcorp.dev/v1/accounts/${accountId}/balance`,
+        {
+          headers: {
+            'X-API-Key': 'YOUR_KEY'
+          }
+        }
+      );
+      return await response.json();
+    };
+
+    // Display formatted balance
+    const displayBalance = async (accountId) => {
+      const balance = await getBalance(accountId);
+      
+      const available = yoctoToNear(balance.amount);
+      const locked = yoctoToNear(balance.locked);
+      const total = (parseFloat(available) + parseFloat(locked)).toFixed(6);
+      
+      console.log(`Account: ${accountId}`);
+      console.log(`Available: ${available} NEAR`);
+      console.log(`Locked: ${locked} NEAR`);
+      console.log(`Total: ${total} NEAR`);
+      console.log(`Storage: ${balance.storage_usage} bytes`);
+      console.log(`Contract: ${balance.code_hash !== '11111111111111111111111111111111' ? 'Yes' : 'No'}`);
+      
+      return balance;
+    };
+
+    // Compare balances across accounts
+    const compareBalances = async (accountIds) => {
+      const balances = await Promise.all(
+        accountIds.map(async id => ({
+          account: id,
+          data: await getBalance(id)
+        }))
+      );
+      
+      return balances.map(({ account, data }) => ({
+        account,
+        available: yoctoToNear(data.amount),
+        locked: yoctoToNear(data.locked),
+        total: (parseFloat(yoctoToNear(data.amount)) + parseFloat(yoctoToNear(data.locked))).toFixed(6),
+        hasContract: data.code_hash !== '11111111111111111111111111111111'
+      }));
+    };
+
+    // Monitor balance changes
+    const monitorBalance = async (accountId, intervalMs = 10000) => {
+      let lastBalance = null;
+      
+      const check = async () => {
+        const balance = await getBalance(accountId);
+        const current = balance.amount;
+        
+        if (lastBalance && current !== lastBalance) {
+          const change = BigInt(current) - BigInt(lastBalance);
+          const nearChange = Number(change) / 1e24;
+          console.log(`💰 Balance changed: ${nearChange > 0 ? '+' : ''}${nearChange.toFixed(6)} NEAR`);
+        }
+        
+        lastBalance = current;
+      };
+      
+      await check();
+      setInterval(check, intervalMs);
+    };
+
+    // Usage
+    await displayBalance('therealmagyar.near');
+    
+    const comparison = await compareBalances([
+      'alice.near',
+      'bob.near',
+      'charlie.near'
+    ]);
+    
+    // Monitor balance (uncomment to use)
+    // await monitorBalance('alice.near', 10000);
+    ```
+  </Tab>
+  
+  <Tab title="Python">
+    ```python
+    import requests
+    from typing import Dict, List
+    from decimal import Decimal
+    import time
+
+    class BalanceAPI:
+        def __init__(self, api_key: str):
+            self.base_url = 'https://api.shadowcorp.dev'
+            self.headers = {'X-API-Key': api_key}
+        
+        @staticmethod
+        def yocto_to_near(yocto_amount: str) -> str:
+            """Convert yoctoNEAR to NEAR"""
+            amount = Decimal(yocto_amount) / Decimal(10**24)
+            return f"{amount:.6f}"
+        
+        def get_balance(self, account_id: str) -> Dict:
+            """Get account balance"""
+            response = requests.get(
+                f'{self.base_url}/v1/accounts/{account_id}/balance',
+                headers=self.headers
+            )
+            response.raise_for_status()
+            return response.json()
+        
+        def display_balance(self, account_id: str) -> Dict:
+            """Display formatted balance information"""
+            balance = self.get_balance(account_id)
+            
+            available = self.yocto_to_near(balance['amount'])
+            locked = self.yocto_to_near(balance['locked'])
+            total = f"{(Decimal(available) + Decimal(locked)):.6f}"
+            
+            has_contract = balance['code_hash'] != '11111111111111111111111111111111'
+            
+            print(f"Account: {account_id}")
+            print(f"Available: {available} NEAR")
+            print(f"Locked: {locked} NEAR")
+            print(f"Total: {total} NEAR")
+            print(f"Storage: {balance['storage_usage']} bytes")
+            print(f"Contract: {'Yes' if has_contract else 'No'}")
+            
+            return balance
+        
+        def get_available_balance(self, account_id: str) -> str:
+            """Get just the available balance in NEAR"""
+            balance = self.get_balance(account_id)
+            return self.yocto_to_near(balance['amount'])
+        
+        def is_contract(self, account_id: str) -> bool:
+            """Check if account has a deployed contract"""
+            balance = self.get_balance(account_id)
+            return balance['code_hash'] != '11111111111111111111111111111111'
+        
+        def compare_balances(self, account_ids: List[str]) -> List[Dict]:
+            """Compare balances across multiple accounts"""
+            results = []
+            
+            for account_id in account_ids:
+                balance = self.get_balance(account_id)
+                available = self.yocto_to_near(balance['amount'])
+                locked = self.yocto_to_near(balance['locked'])
+                
+                results.append({
+                    'account': account_id,
+                    'available': available,
+                    'locked': locked,
+                    'total': f"{(Decimal(available) + Decimal(locked)):.6f}",
+                    'has_contract': balance['code_hash'] != '11111111111111111111111111111111'
+                })
+            
+            return results
+        
+        def monitor_balance(self, account_id: str, interval_seconds: int = 10):
+            """Monitor balance changes"""
+            last_balance = None
+            
+            print(f"Monitoring balance for {account_id}...")
+            print("Press Ctrl+C to stop\n")
+            
+            try:
+                while True:
+                    balance = self.get_balance(account_id)
+                    current = balance['amount']
+                    
+                    if last_balance and current != last_balance:
+                        change = Decimal(current) - Decimal(last_balance)
+                        near_change = change / Decimal(10**24)
+                        print(f"💰 Balance changed: {'+' if near_change > 0 else ''}{near_change:.6f} NEAR")
+                        print(f"   New balance: {self.yocto_to_near(current)} NEAR")
+                    
+                    last_balance = current
+                    time.sleep(interval_seconds)
+            except KeyboardInterrupt:
+                print("\nMonitoring stopped.")
+
+    # Usage
+    api = BalanceAPI('YOUR_KEY')
+    
+    # Get and display balance
+    api.display_balance('therealmagyar.near')
+    
+    # Get just the available balance
+    balance = api.get_available_balance('alice.near')
+    print(f"Available: {balance} NEAR")
+    
+    # Check if account is a contract
+    if api.is_contract('wrap.near'):
+        print("This is a smart contract account")
+    
+    # Compare multiple accounts
+    comparison = api.compare_balances([
+        'alice.near',
+        'bob.near',
+        'charlie.near'
+    ])
+    
+    for account in comparison:
+        print(f"{account['account']}: {account['total']} NEAR")
+    
+    # Monitor balance (uncomment to use)
+    # api.monitor_balance('alice.near', 10)
+    ```
+  </Tab>
+  
+  <Tab title="Go">
+    ```go
+    package main
+
+    import (
+        "encoding/json"
+        "fmt"
+        "math/big"
+        "net/http"
+        "time"
+    )
+
+    type BalanceClient struct {
+        BaseURL string
+        APIKey  string
+        Client  *http.Client
+    }
+
+    type Balance struct {
+        Amount       string `json:"amount"`
+        Locked       string `json:"locked"`
+        StorageUsage int    `json:"storage_usage"`
+        CodeHash     string `json:"code_hash"`
+    }
+
+    func NewBalanceClient(apiKey string) *BalanceClient {
+        return &BalanceClient{
+            BaseURL: "https://api.shadowcorp.dev",
+            APIKey:  apiKey,
+            Client:  &http.Client{},
+        }
+    }
+
+    func (c *BalanceClient) GetBalance(accountID string) (*Balance, error) {
+        reqURL := fmt.Sprintf("%s/v1/accounts/%s/balance", c.BaseURL, accountID)
+        
+        req, err := http.NewRequest("GET", reqURL, nil)
+        if err != nil {
+            return nil, err
+        }
+        
+        req.Header.Add("X-API-Key", c.APIKey)
+        
+        resp, err := c.Client.Do(req)
+        if err != nil {
+            return nil, err
+        }
+        defer resp.Body.Close()
+
+        var balance Balance
+        if err := json.NewDecoder(resp.Body).Decode(&balance); err != nil {
+            return nil, err
+        }
+        
+        return &balance, nil
+    }
+
+    func YoctoToNear(yocto string) (string, error) {
+        amount := new(big.Int)
+        amount, ok := amount.SetString(yocto, 10)
+        if !ok {
+            return "", fmt.Errorf("invalid yocto amount")
+        }
+        
+        divisor := new(big.Int).Exp(big.NewInt(10), big.NewInt(24), nil)
+        quotient := new(big.Float).Quo(
+            new(big.Float).SetInt(amount),
+            new(big.Float).SetInt(divisor),
+        )
+        
+        return quotient.Text('f', 6), nil
+    }
+
+    func (c *BalanceClient) DisplayBalance(accountID string) error {
+        balance, err := c.GetBalance(accountID)
+        if err != nil {
+            return err
+        }
+        
+        available, err := YoctoToNear(balance.Amount)
+        if err != nil {
+            return err
+        }
+        
+        locked, err := YoctoToNear(balance.Locked)
+        if err != nil {
+            return err
+        }
+        
+        hasContract := balance.CodeHash != "11111111111111111111111111111111"
+        contractStatus := "No"
+        if hasContract {
+            contractStatus = "Yes"
+        }
+        
+        fmt.Printf("Account: %s\n", accountID)
+        fmt.Printf("Available: %s NEAR\n", available)
+        fmt.Printf("Locked: %s NEAR\n", locked)
+        fmt.Printf("Storage: %d bytes\n", balance.StorageUsage)
+        fmt.Printf("Contract: %s\n", contractStatus)
+        
+        return nil
+    }
+
+    func (c *BalanceClient) IsContract(accountID string) (bool, error) {
+        balance, err := c.GetBalance(accountID)
+        if err != nil {
+            return false, err
+        }
+        
+        return balance.CodeHash != "11111111111111111111111111111111", nil
+    }
+
+    func (c *BalanceClient) MonitorBalance(accountID string, intervalSeconds int) error {
+        var lastBalance string
+        
+        fmt.Printf("Monitoring balance for %s...\n", accountID)
+        fmt.Println("Press Ctrl+C to stop\n")
+        
+        ticker := time.NewTicker(time.Duration(intervalSeconds) * time.Second)
+        defer ticker.Stop()
+        
+        // Check immediately
+        balance, err := c.GetBalance(accountID)
+        if err != nil {
+            return err
+        }
+        lastBalance = balance.Amount
+        
+        for range ticker.C {
+            balance, err := c.GetBalance(accountID)
+            if err != nil {
+                fmt.Printf("Error: %v\n", err)
+                continue
+            }
+            
+            if lastBalance != "" && balance.Amount != lastBalance {
+                fmt.Printf("💰 Balance changed!\n")
+                available, _ := YoctoToNear(balance.Amount)
+                fmt.Printf("   New balance: %s NEAR\n", available)
+            }
+            
+            lastBalance = balance.Amount
+        }
+        
+        return nil
+    }
+
+    func main() {
+        client := NewBalanceClient("YOUR_KEY")
+        
+        // Display balance
+        err := client.DisplayBalance("therealmagyar.near")
+        if err != nil {
+            panic(err)
+        }
+        
+        // Check if contract
+        isContract, err := client.IsContract("wrap.near")
+        if err != nil {
+            panic(err)
+        }
+        
+        if isContract {
+            fmt.Println("\nThis is a smart contract account")
+        }
+        
+        // Monitor balance (uncomment to use)
+        // client.MonitorBalance("alice.near", 10)
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Response Format
+
+<ResponseField name="amount" type="string" required>
+  Available balance in yoctoNEAR (10^-24 NEAR). This is the spendable balance that can be transferred or used for gas fees.
+  
+  **Note:** Divide by 10^24 (1,000,000,000,000,000,000,000,000) to convert to NEAR.
+</ResponseField>
+
+<ResponseField name="locked" type="string" required>
+  Locked balance in yoctoNEAR. This balance is reserved for storage staking and cannot be transferred.
+  
+  **Storage Staking:** Every account must maintain a minimum balance to pay for on-chain storage. More storage usage requires more locked NEAR.
+</ResponseField>
+
+<ResponseField name="storage_usage" type="integer" required>
+  Storage used by this account in bytes. This determines the minimum locked balance required.
+  
+  **Formula:** Minimum locked balance ≈ storage_usage × 0.00001 NEAR per byte
+</ResponseField>
+
+<ResponseField name="code_hash" type="string" required>
+  Hash of the deployed smart contract code. 
+  
+  - `11111111111111111111111111111111` - No contract deployed (regular account)
+  - Any other value - Smart contract is deployed
+</ResponseField>
+
+### Success Response (200 OK)
+
+**Regular User Account (therealmagyar.near):**
+```json
+{
+  "amount": "12817632130134446609948969",
+  "locked": "0",
+  "storage_usage": 182,
+  "code_hash": "11111111111111111111111111111111"
+}
+```
+
+**Conversion to NEAR:**
+```javascript
+// amount: 12817632130134446609948969 yoctoNEAR
+// = 12,817,632,130,134,446,609,948,969 / 1,000,000,000,000,000,000,000,000
+// = 12.817632 NEAR (available)
+```
+
+**Account with Locked Balance:**
+```json
+{
+  "amount": "125450000000000000000000000",
+  "locked": "350000000000000000000000",
+  "storage_usage": 2840,
+  "code_hash": "11111111111111111111111111111111"
+}
+```
+
+**Smart Contract Account:**
+```json
+{
+  "amount": "1000000000000000000000000000",
+  "locked": "5000000000000000000000000",
+  "storage_usage": 125430,
+  "code_hash": "7KoZ3pWZxrKd5n8xCjV5xDVBLvKm2hKCXUhR2cTXvYZL"
+}
+```
+
+**New Account (Minimum Balance):**
+```json
+{
+  "amount": "0",
+  "locked": "0",
+  "storage_usage": 182,
+  "code_hash": "11111111111111111111111111111111"
+}
+```
+
+<Check>
+  A `200 OK` status code indicates the balance was retrieved successfully. All NEAR accounts start with 182 bytes of storage usage (minimum).
+</Check>
+
+<Note>
+  **yoctoNEAR Conversion:** 
+  - 1 NEAR = 10^24 yoctoNEAR
+  - 1 yoctoNEAR = 0.000000000000000000000001 NEAR
+  
+  Use the helper functions in the code examples to convert between formats.
+</Note>
+
+## Understanding NEAR Balances
+
+<AccordionGroup>
+  <Accordion title="Available vs Locked Balance" icon="coins">
+    NEAR accounts have two types of balance:
+    
+    **Available Balance (`amount`):**
+    - Can be transferred to other accounts
+    - Used to pay for transaction gas fees
+    - Can be withdrawn or spent freely
+    - Shown in most wallet interfaces
+    
+    **Locked Balance (`locked`):**
+    - Reserved for on-chain storage costs
+    - Cannot be transferred or spent
+    - Proportional to account's storage usage
+    - Required to keep the account active
+    
+    **Total Balance:**
+    ```javascript
+    const totalBalance = BigInt(amount) + BigInt(locked);
+    ```
+    
+    <Tip>
+      If you try to transfer your entire available balance, some must remain for storage. Always leave at least 0.1 NEAR for safety.
+    </Tip>
+  </Accordion>
+  
+  <Accordion title="Storage Staking" icon="database">
+    Every byte of on-chain storage requires locked NEAR:
+    
+    **Storage Cost:** ~0.00001 NEAR per byte (10,000 yoctoNEAR)
+    
+    **What Consumes Storage:**
+    - Account state (182 bytes minimum)
+    - Access keys
+    - Contract code
+    - Contract state
+    - Token balances (NEP-141)
+    - NFT metadata
+    
+    **Example Calculations:**
+    ```javascript
+    // Minimum account: 182 bytes
+    182 × 0.00001 = 0.00182 NEAR locked
+    
+    // Account with tokens: 2,840 bytes
+    2840 × 0.00001 = 0.0284 NEAR locked
+    
+    // Contract account: 125,430 bytes
+    125430 × 0.00001 = 1.2543 NEAR locked
+    ```
+    
+    <Warning>
+      Locked balance increases as you interact with contracts, hold tokens, or deploy code. Always maintain sufficient available balance.
+    </Warning>
+  </Accordion>
+  
+  <Accordion title="Contract Accounts" icon="file-code">
+    The `code_hash` field identifies smart contract accounts:
+    
+    **Regular Account:**
+    ```json
+    {
+      "code_hash": "11111111111111111111111111111111"
+    }
+    ```
+    This is the default hash for accounts without deployed contracts.
+    
+    **Contract Account:**
+    ```json
+    {
+      "code_hash": "7KoZ3pWZxrKd5n8xCjV5xDVBLvKm2hKCXUhR2cTXvYZL"
+    }
+    ```
+    Any other hash indicates a deployed contract.
+    
+    **Check if Contract:**
+    ```javascript
+    function isContract(balance) {
+      return balance.code_hash !== '11111111111111111111111111111111';
+    }
+    
+    const balance = await getBalance('wrap.near');
+    if (isContract(balance)) {
+      console.log('This is a smart contract');
+    }
+    ```
+    
+    <Info>
+      Contract accounts typically have much higher storage usage due to stored contract code and state.
+    </Info>
+  </Accordion>
+  
+  <Accordion title="Balance Precision" icon="calculator">
+    Working with yoctoNEAR requires careful handling of large numbers:
+    
+    **JavaScript (use BigInt):**
+    ```javascript
+    // ❌ Wrong - loses precision
+    const near = parseInt(yoctoAmount) / 1e24;
+    
+    // ✅ Correct - preserves precision
+    const near = Number(BigInt(yoctoAmount)) / 1e24;
+    ```
+    
+    **Python (use Decimal):**
+    ```python
+    from decimal import Decimal
+    
+    # ❌ Wrong - loses precision
+    near = float(yocto_amount) / 1e24
+    
+    # ✅ Correct - preserves precision
+    near = Decimal(yocto_amount) / Decimal(10**24)
+    ```
+    
+    **Go (use math/big):**
+    ```go
+    // Use big.Int for yoctoNEAR
+    amount := new(big.Int)
+    amount.SetString(yoctoAmount, 10)
+    
+    // Use big.Float for division
+    divisor := new(big.Int).Exp(big.NewInt(10), big.NewInt(24), nil)
+    near := new(big.Float).Quo(
+        new(big.Float).SetInt(amount),
+        new(big.Float).SetInt(divisor),
+    )
+    ```
+    
+    <Warning>
+      Never use floating-point arithmetic directly with yoctoNEAR values. Always use BigInt/Decimal/big.Int types.
+    </Warning>
+  </Accordion>
+</AccordionGroup>
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Real-Time Balance Monitoring" icon="chart-line" color="#3b82f6">
+    Build balance trackers and alert systems for wallet applications.
+  </Card>
+  
+  <Card title="Payment Verification" icon="shield-check" color="#10b981">
+    Verify sufficient balance before processing transactions or payments.
+  </Card>
+  
+  <Card title="Wallet Dashboards" icon="wallet" color="#8b5cf6">
+    Display user balances in wallet interfaces with real-time updates.
+  </Card>
+  
+  <Card title="Account Analytics" icon="chart-pie" color="#f59e0b">
+    Track balance distributions and identify high-value accounts.
+  </Card>
+</CardGroup>
+
+## Advanced Example: Balance Tracker
+
+Here's a complete balance tracking and monitoring system:
+
+```javascript
+class BalanceTracker {
+  constructor(apiKey) {
+    this.apiKey = apiKey;
+    this.baseUrl = 'https://api.shadowcorp.dev';
+    this.cache = new Map();
+    this.monitors = new Map();
+  }
+
+  yoctoToNear(yocto) {
+    return Number(BigInt(yocto)) / 1e24;
+  }
+
+  async getBalance(accountId) {
+    const response = await fetch(
+      `${this.baseUrl}/v1/accounts/${accountId}/balance`,
+      {
+        headers: { 'X-API-Key': this.apiKey }
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch balance: ${response.statusText}`);
+    }
+
+    return await response.json();
+  }
+
+  async getBalanceInNear(accountId) {
+    const balance = await this.getBalance(accountId);
+    return {
+      available: this.yoctoToNear(balance.amount),
+      locked: this.yoctoToNear(balance.locked),
+      total: this.yoctoToNear(balance.amount) + this.yoctoToNear(balance.locked),
+      storageUsage: balance.storage_usage,
+      isContract: balance.code_hash !== '11111111111111111111111111111111'
+    };
+  }
+
+  async hasMinimumBalance(accountId, minNear) {
+    const balance = await this.getBalanceInNear(accountId);
+    return balance.available >= minNear;
+  }
+
+  async compareBalances(accountIds) {
+    console.log(`📊 Comparing balances for ${accountIds.length} accounts...\n`);
+    
+    const balances = await Promise.all(
+      accountIds.map(async id => ({
+        account: id,
+        balance: await this.getBalanceInNear(id)
+      }))
+    );
+
+    // Sort by total balance (descending)
+    const sorted = balances.sort((a, b) => 
+      b.balance.total - a.balance.total
+    );
+
+    // Display comparison table
+    console.log('Balance Comparison:');
+    console.log('─'.repeat(90));
+    console.log(
+      'Account'.padEnd(30) + 
+      'Available'.padEnd(20) + 
+      'Locked'.padEnd(20) + 
+      'Type'
+    );
+    console.log('─'.repeat(90));
+
+    sorted.forEach(({ account, balance }) => {
+      const acc = account.substring(0, 28);
+      const avail = `${balance.available.toFixed(6)} NEAR`;
+      const lock = `${balance.locked.toFixed(6)} NEAR`;
+      const type = balance.isContract ? 'Contract' : 'Account';
+      
+      console.log(
+        acc.padEnd(30) +
+        avail.padEnd(20) +
+        lock.padEnd(20) +
+        type
+      );
+    });
+
+    console.log('─'.repeat(90) + '\n');
+
+    return sorted;
+  }
+
+  async findWhales(accountIds, minBalance = 1000) {
+    console.log(`🐋 Finding whales (min ${minBalance} NEAR)...\n`);
+    
+    const balances = await Promise.all(
+      accountIds.map(async id => ({
+        account: id,
+        balance: await this.getBalanceInNear(id)
+      }))
+    );
+
+    const whales = balances
+      .filter(({ balance }) => balance.total >= minBalance)
+      .sort((a, b) => b.balance.total - a.balance.total);
+
+    whales.forEach(({ account, balance }, index) => {
+      console.log(
+        `${index + 1}. ${account}: ${balance.total.toFixed(6)} NEAR`
+      );
+    });
+
+    console.log(`\nFound ${whales.length} whale accounts.\n`);
+    return whales;
+  }
+
+  async monitorBalance(accountId, callback, intervalMs = 10000) {
+    console.log(`👀 Monitoring ${accountId}...`);
+    
+    let lastBalance = null;
+
+    const check = async () => {
+      try {
+        const balance = await this.getBalance(accountId);
+        const current = balance.amount;
+
+        if (lastBalance && current !== lastBalance) {
+          const change = BigInt(current) - BigInt(lastBalance);
+          const nearChange = Number(change) / 1e24;
+          
+          callback({
+            account: accountId,
+            change: nearChange,
+            newBalance: this.yoctoToNear(current),
+            direction: nearChange > 0 ? 'incoming' : 'outgoing'
+          });
+        }
+
+        lastBalance = current;
+      } catch (error) {
+        console.error(`Error monitoring ${accountId}:`, error.message);
+      }
+    };
+
+    // Initial check
+    await check();
+
+    // Set up interval
+    const intervalId = setInterval(check, intervalMs);
+    this.monitors.set(accountId, intervalId);
+
+    return () => {
+      clearInterval(intervalId);
+      this.monitors.delete(accountId);
+    };
+  }
+
+  stopMonitoring(accountId) {
+    const intervalId = this.monitors.get(accountId);
+    if (intervalId) {
+      clearInterval(intervalId);
+      this.monitors.delete(accountId);
+      console.log(`⏹️  Stopped monitoring ${accountId}`);
+    }
+  }
+
+  stopAllMonitoring() {
+    for (const [accountId, intervalId] of this.monitors) {
+      clearInterval(intervalId);
+      console.log(`⏹️  Stopped monitoring ${accountId}`);
+    }
+    this.monitors.clear();
+  }
+
+  async generateReport(accountId) {
+    const balance = await this.getBalance(accountId);
+    const near = this.yoctoToNear(balance.amount);
+    const locked = this.yoctoToNear(balance.locked);
+    const total = near + locked;
+    const isContract = balance.code_hash !== '11111111111111111111111111111111';
+
+    console.log('\n' + '='.repeat(60));
+    console.log(`Balance Report: ${accountId}`);
+    console.log('='.repeat(60));
+    
+    console.log(`\n💰 Balances:`);
+    console.log(`  Available: ${near.toFixed(6)} NEAR`);
+    console.log(`  Locked: ${locked.toFixed(6)} NEAR`);
+    console.log(`  Total: ${total.toFixed(6)} NEAR`);
+    
+    console.log(`\n📦 Storage:`);
+    console.log(`  Usage: ${balance.storage_usage} bytes`);
+    console.log(`  Cost: ~${(balance.storage_usage * 0.00001).toFixed(5)} NEAR`);
+    
+    console.log(`\n🔧 Account Type:`);
+    console.log(`  ${isContract ? '📝 Smart Contract' : '👤 Regular Account'}`);
+    if (isContract) {
+      console.log(`  Code Hash: ${balance.code_hash}`);
+    }
+
+    console.log('='.repeat(60) + '\n');
+
+    return balance;
+  }
+
+  async checkTransferability(accountId, amountNear) {
+    const balance = await this.getBalanceInNear(accountId);
+    const storageReserve = 0.1; // Keep 0.1 NEAR for safety
+    const maxTransferable = balance.available - storageReserve;
+
+    if (amountNear > maxTransferable) {
+      return {
+        canTransfer: false,
+        reason: 'Insufficient balance',
+        available: balance.available,
+        requested: amountNear,
+        maxTransferable
+      };
+    }
+
+    return {
+      canTransfer: true,
+      available: balance.available,
+      requested: amountNear,
+      remaining: balance.available - amountNear
+    };
+  }
+}
+
+// Usage Examples
+const tracker = new BalanceTracker('YOUR_KEY');
+
+// Generate detailed report
+await tracker.generateReport('therealmagyar.near');
+
+// Check if account can transfer
+const check = await tracker.checkTransferability('alice.near', 50);
+if (check.canTransfer) {
+  console.log(`✅ Can transfer ${check.requested} NEAR`);
+  console.log(`   Remaining: ${check.remaining.toFixed(6)} NEAR`);
+} else {
+  console.log(`❌ Cannot transfer: ${check.reason}`);
+  console.log(`   Max transferable: ${check.maxTransferable.toFixed(6)} NEAR`);
+}
+
+// Compare multiple accounts
+await tracker.compareBalances([
+  'alice.near',
+  'bob.near',
+  'charlie.near',
+  'wrap.near'
+]);
+
+// Find whales
+await tracker.findWhales([
+  'alice.near',
+  'bob.near',
+  'whale1.near',
+  'whale2.near'
+], 100);
+
+// Monitor balance changes
+const stopMonitoring = await tracker.monitorBalance('alice.near', (event) => {
+  console.log(`💰 ${event.direction === 'incoming' ? '⬇️' : '⬆️'} ${event.change.toFixed(6)} NEAR`);
+  console.log(`   New balance: ${event.newBalance.toFixed(6)} NEAR`);
+});
+
+// Stop monitoring after 1 minute
+setTimeout(() => {
+  stopMonitoring();
+}, 60000);
+```
+
+## Practical Examples
+
+### Payment Verification
+
+Verify a user has sufficient balance before processing payment:
+
+```javascript
+async function verifyPaymentBalance(accountId, paymentAmountNear) {
+  const balance = await fetch(
+    `https://api.shadowcorp.dev/v1/accounts/${accountId}/balance`,
+    { headers: { 'X-API-Key': 'YOUR_KEY' } }
+  ).then(r => r.json());
+
+  const available = Number(BigInt(balance.amount)) / 1e24;
+  const storageReserve = 0.1; // Always keep 0.1 NEAR for storage
+  const maxPayable = available - storageReserve;
+
+  if (paymentAmountNear > maxPayable) {
+    return {
+      success: false,
+      message: `Insufficient balance. Available: ${available.toFixed(6)} NEAR, Required: ${paymentAmountNear} NEAR (+ 0.1 NEAR reserve)`,
+      availableBalance: available,
+      maxPayable: maxPayable
+    };
+  }
+
+  return {
+    success: true,
+    message: 'Sufficient balance',
+    availableBalance: available,
+    remainingAfter: available - paymentAmountNear
+  };
+}
+
+// Usage
+const verification = await verifyPaymentBalance('alice.near', 50);
+if (verification.success) {
+  console.log('✅ Payment can proceed');
+  console.log(`   Remaining: ${verification.remainingAfter.toFixed(6)} NEAR`);
+} else {
+  console.log('❌ ' + verification.message);
+}
+```
+
+### Storage Cost Calculator
+
+Calculate how much storage a contract or account can afford:
+
+```javascript
+async function calculateStorageCapacity(accountId) {
+  const balance = await fetch(
+    `https://api.shadowcorp.dev/v1/accounts/${accountId}/balance`,
+    { headers: { 'X-API-Key': 'YOUR_KEY' } }
+  ).then(r => r.json());
+
+  const available = Number(BigInt(balance.amount)) / 1e24;
+  const currentStorage = balance.storage_usage;
+  const storagePerByte = 0.00001; // NEAR per byte
+
+  // How many additional bytes can be stored
+  const additionalBytes = Math.floor(available / storagePerByte);
+  const totalCapacity = currentStorage + additionalBytes;
+
+  return {
+    currentStorage: currentStorage,
+    currentCost: (currentStorage * storagePerByte).toFixed(6),
+    availableBalance: available.toFixed(6),
+    additionalCapacity: additionalBytes,
+    totalCapacity: totalCapacity,
+    recommendations: {
+      canDeployContract: additionalBytes > 100000,
+      canStoreTokens: additionalBytes > 1000,
+      needsMoreBalance: additionalBytes < 1000
+    }
+  };
+}
+
+// Usage
+const capacity = await calculateStorageCapacity('alice.near');
+console.log(`Current Storage: ${capacity.currentStorage} bytes`);
+console.log(`Current Cost: ${capacity.currentCost} NEAR`);
+console.log(`Additional Capacity: ${capacity.additionalCapacity} bytes`);
+console.log(`Can deploy contract: ${capacity.recommendations.canDeployContract ? 'Yes' : 'No'}`);
+```
+
+## Error Responses
+
+### 400 Bad Request
+
+```json
+{
+  "error": "Invalid account ID format",
+  "code": 400
+}
+```
+
+<Warning>
+  Ensure the account ID follows NEAR naming conventions or is a valid 64-character implicit account hash.
+</Warning>
+
+### 401 Unauthorized
+
+```json
+{
+  "error": "Missing or invalid API key",
+  "code": 401
+}
+```
+
+### 404 Not Found
+
+```json
+{
+  "error": "Account not found",
+  "code": 404,
+  "account_id": "nonexistent.near"
+}
+```
+
+<Note>
+  A 404 error means the account does not exist on the blockchain.
+</Note>
+
+### 500 Internal Server Error
+
+```json
+{
+  "error": "Failed to fetch balance",
+  "code": 500
+}
+```
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+  <Card 
+    title="Full Account Data" 
+    icon="user-circle" 
+    href="/shadow-api/endpoints/full-account-data"
+  >
+    Get comprehensive account info including tokens and NFTs
+  </Card>
+  
+  <Card 
+    title="Staking Positions" 
+    icon="chart-pie" 
+    href="/shadow-api/endpoints/account-stakings"
+  >
+    Query validator pool staking balances
+  </Card>
+  
+  <Card 
+    title="Account Transactions" 
+    icon="receipt" 
+    href="/shadow-api/endpoints/transactions"
+  >
+    View transaction history for account
+  </Card>
+  
+  <Card 
+    title="Network Stats" 
+    icon="chart-line" 
+    href="/shadow-api/endpoints/stats"
+  >
+    Get network-wide statistics and metrics
+  </Card>
+</CardGroup>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Caching Strategy" icon="database">
+    Balance data changes frequently. Implement smart caching:
+    
+    ```javascript
+    const CACHE_DURATION = 30 * 1000; // 30 seconds
+    
+    class BalanceCache {
+      constructor() {
+        this.cache = new Map();
+      }
+      
+      async get(accountId, fetcher) {
+        const cached = this.cache.get(accountId);
+        
+        if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+          return cached.data;
+        }
+        
+        const data = await fetcher(accountId);
+        this.cache.set(accountId, {
+          data,
+          timestamp: Date.now()
+        });
+        
+        return data;
+      }
+      
+      invalidate(accountId) {
+        this.cache.delete(accountId);
+      }
+    }
+    ```
+    
+    <Tip>
+      Invalidate cache after sending transactions from an account to ensure fresh balance data.
+    </Tip>
+  </Accordion>
+  
+  <Accordion title="Precision Handling" icon="calculator">
+    Always use appropriate data types for yoctoNEAR:
+    
+    ```javascript
+    // ❌ WRONG - Loses precision
+    const wrong = parseInt("12817632130134446609948969") / 1e24;
+    
+    // ✅ CORRECT - Preserves precision
+    const correct = Number(BigInt("12817632130134446609948969")) / 1e24;
+    
+    // For calculations, keep in yoctoNEAR
+    const amount1 = BigInt("12817632130134446609948969");
+    const amount2 = BigInt("5000000000000000000000000");
+    const sum = amount1 + amount2; // Still in yoctoNEAR
+    
+    // Convert only for display
+    const displaySum = Number(sum) / 1e24;
+    ```
+  </Accordion>
+  
+  <Accordion title="Storage Reserve" icon="shield">
+    Always maintain a safety buffer for storage:
+    
+    ```javascript
+    function calculateMaxTransfer(balance) {
+      const available = Number(BigInt(balance.amount)) / 1e24;
+      const storageReserve = 0.1; // 0.1 NEAR minimum
+      
+      // For contracts, reserve more
+      const isContract = balance.code_hash !== '11111111111111111111111111111111';
+      const reserve = isContract ? 0.5 : storageReserve;
+      
+      return Math.max(0, available - reserve);
+    }
+    ```
+    
+    <Warning>
+      Never allow transfers that would reduce available balance below storage requirements.
+    </Warning>
+  </Accordion>
+  
+  <Accordion title="Rate Limiting" icon="gauge">
+    When checking multiple balances, implement rate limiting:
+    
+    ```javascript
+    async function batchGetBalances(accountIds, batchSize = 10) {
+      const results = [];
+      
+      for (let i = 0; i < accountIds.length; i += batchSize) {
+        const batch = accountIds.slice(i, i + batchSize);
+        const batchResults = await Promise.all(
+          batch.map(id => getBalance(id))
+        );
+        results.push(...batchResults);
+        
+        // Small delay between batches
+        if (i + batchSize < accountIds.length) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }
+      
+      return results;
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Performance Tips
+
+<Tip>
+  **Optimize API Usage:**
+  - Use this lightweight endpoint for real-time balance checks
+  - Cache balances for 30-60 seconds in high-traffic applications
+  - Batch multiple balance queries with small delays
+  - Use the full account endpoint only when you need token/NFT data
+</Tip>
+
+<Note>
+  The balance endpoint is optimized for high-frequency queries. It's the fastest way to check account balances without retrieving unnecessary data.
+</Note>

@@ -1,0 +1,366 @@
+---
+title: "Account Balance"
+description: "Retrieve the native NEAR token balance for any account on the NEAR blockchain. This endpoint provides information about liquid balance, locked balance, storage usage, and contract code."
+icon: wallet
+---
+
+import { Callout } from '@/components/ui/callout'
+
+## Get Account Balance
+
+```typescript
+import { ShadowCorpSDK } from 'shadowcorp';
+
+const sdk = new ShadowCorpSDK('your-api-key');
+
+const balance = await sdk.accounts.getBalance('example.near');
+console.log(balance);
+```
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `accountId` | `string` | Yes | NEAR account identifier (e.g., 'example.near') |
+
+### Response Structure
+
+```typescript
+{
+  amount: string;                     // Liquid NEAR balance in yoctoNEAR
+  locked: string;                     // Locked NEAR balance in yoctoNEAR
+  storage_usage: number;              // Storage used in bytes
+  code_hash: string;                  // Contract code hash (all 1s for EOAs)
+}
+```
+
+### Example Response
+
+```json
+{
+  "amount": "12817632130134446609948969",
+  "locked": "0",
+  "storage_usage": 182,
+  "code_hash": "11111111111111111111111111111111"
+}
+```
+
+### Error Handling
+
+```typescript
+try {
+  const balance = await sdk.accounts.getBalance('nonexistent.near');
+} catch (error) {
+  if (error.message.includes('not found')) {
+    console.log('Account does not exist');
+  } else {
+    console.error('Query failed:', error);
+  }
+}
+```
+
+## Understanding Balance Data
+
+### Amount (Liquid Balance)
+
+The `amount` field represents the freely available NEAR tokens that can be transferred or used for transactions. Values are in **yoctoNEAR** (1 NEAR = 10²⁴ yoctoNEAR).
+
+```typescript
+function formatNEAR(yoctoNEAR: string): string {
+  const amount = BigInt(yoctoNEAR);
+  const divisor = BigInt('1000000000000000000000000'); // 10^24
+  const whole = amount / divisor;
+  const fraction = amount % divisor;
+  
+  // Show first 4 decimal places
+  const fractionStr = fraction.toString().padStart(24, '0').substring(0, 4);
+  return `${whole}.${fractionStr}`;
+}
+
+const balance = await sdk.accounts.getBalance('therealmagyar.near');
+console.log(`${formatNEAR(balance.amount)} NEAR`);
+// Output: "12.8176 NEAR"
+```
+
+### Locked Balance
+
+The `locked` field represents NEAR tokens that are temporarily locked, typically for:
+- Staking with validators
+- Storage deposits for contracts
+- Lockup contracts
+
+```typescript
+const balance = await sdk.accounts.getBalance('example.near');
+
+if (balance.locked !== '0') {
+  console.log(`Locked: ${formatNEAR(balance.locked)} NEAR`);
+}
+```
+
+### Storage Usage
+
+Storage on NEAR requires staking NEAR tokens. The `storage_usage` field shows how many bytes of storage the account is using:
+
+```typescript
+const balance = await sdk.accounts.getBalance('example.near');
+
+// Calculate storage cost (1 byte ≈ 0.0001 NEAR)
+const storageCostYocto = BigInt(balance.storage_usage) * BigInt('100000000000000000000'); // 0.0001 NEAR per byte
+console.log(`Storage: ${balance.storage_usage} bytes`);
+console.log(`Storage cost: ${formatNEAR(storageCostYocto.toString())} NEAR`);
+```
+
+### Code Hash
+
+The `code_hash` indicates whether the account is a smart contract:
+- **All 1s** (`11111111111111111111111111111111`): Regular account (EOA)
+- **Other hash**: Smart contract with deployed code
+
+```typescript
+const balance = await sdk.accounts.getBalance('example.near');
+
+const isContract = balance.code_hash !== '11111111111111111111111111111111';
+console.log(`Account type: ${isContract ? 'Smart Contract' : 'Regular Account'}`);
+```
+
+## Use Cases
+
+### Balance Checker
+
+Create a simple balance checker with formatted output:
+
+```typescript
+async function checkBalance(accountId: string) {
+  const balance = await sdk.accounts.getBalance(accountId);
+  
+  const liquid = formatNEAR(balance.amount);
+  const locked = formatNEAR(balance.locked);
+  const total = formatNEAR(
+    (BigInt(balance.amount) + BigInt(balance.locked)).toString()
+  );
+  
+  const isContract = balance.code_hash !== '11111111111111111111111111111111';
+  
+  return {
+    accountId,
+    liquid: `${liquid} NEAR`,
+    locked: `${locked} NEAR`,
+    total: `${total} NEAR`,
+    storageBytes: balance.storage_usage,
+    accountType: isContract ? 'Contract' : 'EOA'
+  };
+}
+
+const info = await checkBalance('therealmagyar.near');
+console.log(info);
+```
+
+### Multi-Account Balance
+
+Check balances for multiple accounts:
+
+```typescript
+async function getMultipleBalances(accountIds: string[]) {
+  const results = await Promise.allSettled(
+    accountIds.map(id => sdk.accounts.getBalance(id))
+  );
+  
+  return accountIds.map((id, index) => {
+    const result = results[index];
+    
+    if (result.status === 'fulfilled') {
+      const balance = result.value;
+      return {
+        accountId: id,
+        balance: formatNEAR(balance.amount),
+        exists: true
+      };
+    } else {
+      return {
+        accountId: id,
+        balance: '0',
+        exists: false
+      };
+    }
+  });
+}
+
+const balances = await getMultipleBalances([
+  'alice.near',
+  'bob.near',
+  'nonexistent.near'
+]);
+
+console.table(balances);
+```
+
+### Total Value Calculator
+
+Calculate total account value including locked tokens:
+
+```typescript
+async function getTotalValue(accountId: string) {
+  const balance = await sdk.accounts.getBalance(accountId);
+  
+  const liquid = BigInt(balance.amount);
+  const locked = BigInt(balance.locked);
+  const total = liquid + locked;
+  
+  return {
+    liquidNEAR: formatNEAR(liquid.toString()),
+    lockedNEAR: formatNEAR(locked.toString()),
+    totalNEAR: formatNEAR(total.toString()),
+    liquidPercentage: ((Number(liquid) / Number(total)) * 100).toFixed(2) + '%',
+    lockedPercentage: ((Number(locked) / Number(total)) * 100).toFixed(2) + '%'
+  };
+}
+
+const value = await getTotalValue('example.near');
+console.log(`Total: ${value.totalNEAR}`);
+console.log(`Liquid: ${value.liquidNEAR} (${value.liquidPercentage})`);
+console.log(`Locked: ${value.lockedNEAR} (${value.lockedPercentage})`);
+```
+
+### Balance Monitor
+
+Monitor account balance changes over time:
+
+```typescript
+class BalanceMonitor {
+  private lastBalance: string | null = null;
+  
+  async check(accountId: string) {
+    const balance = await sdk.accounts.getBalance(accountId);
+    const current = balance.amount;
+    
+    if (this.lastBalance && this.lastBalance !== current) {
+      const previous = BigInt(this.lastBalance);
+      const now = BigInt(current);
+      const change = now - previous;
+      
+      const direction = change > 0n ? '📈' : '📉';
+      const changeFormatted = formatNEAR(change.toString().replace('-', ''));
+      
+      console.log(`${direction} Balance changed: ${changeFormatted} NEAR`);
+    }
+    
+    this.lastBalance = current;
+    return balance;
+  }
+}
+
+const monitor = new BalanceMonitor();
+setInterval(() => monitor.check('example.near'), 10000); // Check every 10s
+```
+
+### Account Type Detector
+
+Detect and categorize accounts:
+
+```typescript
+async function detectAccountType(accountId: string) {
+  const balance = await sdk.accounts.getBalance(accountId);
+  
+  const isContract = balance.code_hash !== '11111111111111111111111111111111';
+  const hasBalance = BigInt(balance.amount) > 0n;
+  const hasLockedBalance = BigInt(balance.locked) > 0n;
+  const storageSize = balance.storage_usage;
+  
+  let category = 'Unknown';
+  
+  if (!isContract && !hasBalance && storageSize <= 200) {
+    category = 'Empty EOA';
+  } else if (!isContract && hasBalance) {
+    category = 'Active EOA';
+  } else if (isContract && storageSize > 1000) {
+    category = 'Large Contract';
+  } else if (isContract) {
+    category = 'Contract';
+  }
+  
+  return {
+    accountId,
+    category,
+    isContract,
+    balance: formatNEAR(balance.amount),
+    storageBytes: storageSize
+  };
+}
+
+const accountType = await detectAccountType('example.near');
+console.log(accountType);
+```
+
+## Best Practices
+
+### Use BigInt for Calculations
+
+<Callout type="warning">
+Always use `BigInt` when working with NEAR amounts to avoid precision loss.
+</Callout>
+
+```typescript
+// ❌ Incorrect - loses precision
+const balance = Number('12817632130134446609948969');
+
+// ✅ Correct - preserves precision
+const balance = BigInt('12817632130134446609948969');
+```
+
+### Format for Display
+
+Create a reusable formatting function:
+
+```typescript
+class NEARFormatter {
+  static readonly YOCTO_PER_NEAR = BigInt('1000000000000000000000000');
+  
+  static toNEAR(yoctoNEAR: string, decimals: number = 4): string {
+    const amount = BigInt(yoctoNEAR);
+    const whole = amount / this.YOCTO_PER_NEAR;
+    const fraction = amount % this.YOCTO_PER_NEAR;
+    const fractionStr = fraction.toString().padStart(24, '0').substring(0, decimals);
+    return `${whole}.${fractionStr}`;
+  }
+  
+  static toYocto(near: string): string {
+    const [whole, fraction = '0'] = near.split('.');
+    const fractionPadded = fraction.padEnd(24, '0');
+    const yocto = BigInt(whole) * this.YOCTO_PER_NEAR + BigInt(fractionPadded);
+    return yocto.toString();
+  }
+}
+
+const formatted = NEARFormatter.toNEAR('12817632130134446609948969');
+console.log(`${formatted} NEAR`);
+```
+
+### Cache Balance Data
+
+For UI applications, implement caching to reduce API calls:
+
+```typescript
+class BalanceCache {
+  private cache = new Map<string, { data: any; timestamp: number }>();
+  private ttl = 10000; // 10 seconds
+  
+  async get(accountId: string) {
+    const cached = this.cache.get(accountId);
+    
+    if (cached && Date.now() - cached.timestamp < this.ttl) {
+      return cached.data;
+    }
+    
+    const balance = await sdk.accounts.getBalance(accountId);
+    this.cache.set(accountId, { data: balance, timestamp: Date.now() });
+    
+    return balance;
+  }
+  
+  invalidate(accountId: string) {
+    this.cache.delete(accountId);
+  }
+}
+```
+
+For support: [support@shadowcorp.dev](mailto:support@shadowcorp.dev)

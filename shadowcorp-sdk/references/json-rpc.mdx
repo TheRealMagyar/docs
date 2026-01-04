@@ -1,0 +1,711 @@
+---
+title: "JSON-RPC"
+description: "Access NEAR blockchain RPC methods directly through the ShadowCorp API. Execute any NEAR JSON-RPC 2.0 call, from simple status checks to complex smart contract queries, with built-in batching support for efficient operations."
+icon: code
+---
+
+import { Callout } from '@/components/ui/callout'
+
+## Simple RPC Call
+
+Execute a single JSON-RPC 2.0 request to the NEAR blockchain.
+
+```typescript
+import { ShadowCorpSDK } from 'shadowcorp';
+
+const sdk = new ShadowCorpSDK('your-api-key');
+
+// Get blockchain status
+const status = await sdk.rpc.proxy({
+  jsonrpc: '2.0',
+  id: '1',
+  method: 'status',
+  params: []
+});
+
+console.log(status);
+```
+
+### Parameters
+
+The RPC proxy accepts a standard JSON-RPC 2.0 request object:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `jsonrpc` | `string` | Yes | JSON-RPC version (always "2.0") |
+| `id` | `string \| number` | Yes | Request identifier |
+| `method` | `string` | Yes | RPC method name |
+| `params` | `object \| array` | Yes | Method parameters |
+
+### Common RPC Methods
+
+#### Get Node Status
+
+```typescript
+const status = await sdk.rpc.proxy({
+  jsonrpc: '2.0',
+  id: '1',
+  method: 'status',
+  params: []
+});
+
+console.log('Chain ID:', status.result.chain_id);
+console.log('Latest Block:', status.result.sync_info.latest_block_height);
+```
+
+#### View Account
+
+```typescript
+const account = await sdk.rpc.proxy({
+  jsonrpc: '2.0',
+  id: '2',
+  method: 'query',
+  params: {
+    request_type: 'view_account',
+    finality: 'final',
+    account_id: 'near'
+  }
+});
+
+console.log('Balance:', account.result.amount);
+console.log('Storage:', account.result.storage_usage);
+```
+
+#### Call Contract Function
+
+```typescript
+// Get token metadata
+const result = await sdk.rpc.proxy({
+  jsonrpc: '2.0',
+  id: '3',
+  method: 'query',
+  params: {
+    request_type: 'call_function',
+    finality: 'final',
+    account_id: 'wrap.near',
+    method_name: 'ft_metadata',
+    args_base64: 'e30=' // base64 encoded "{}"
+  }
+});
+
+const metadata = JSON.parse(
+  Buffer.from(result.result.result).toString()
+);
+console.log('Token:', metadata);
+```
+
+#### Get Block
+
+```typescript
+const block = await sdk.rpc.proxy({
+  jsonrpc: '2.0',
+  id: '4',
+  method: 'block',
+  params: {
+    finality: 'final'
+  }
+});
+
+console.log('Block Hash:', block.result.header.hash);
+console.log('Block Height:', block.result.header.height);
+```
+
+#### Get Transaction Status
+
+```typescript
+const tx = await sdk.rpc.proxy({
+  jsonrpc: '2.0',
+  id: '5',
+  method: 'tx',
+  params: {
+    tx_hash: 'TRANSACTION_HASH',
+    sender_account_id: 'sender.near'
+  }
+});
+
+console.log('Status:', tx.result.status);
+```
+
+## Batch RPC Calls
+
+Execute multiple RPC requests in a single API call for improved performance.
+
+```typescript
+const results = await sdk.rpc.batch([
+  {
+    jsonrpc: '2.0',
+    id: '1',
+    method: 'status',
+    params: []
+  },
+  {
+    jsonrpc: '2.0',
+    id: '2',
+    method: 'query',
+    params: {
+      request_type: 'view_account',
+      finality: 'final',
+      account_id: 'near'
+    }
+  }
+]);
+
+console.log(results);
+```
+
+### Batch Response
+
+The batch method returns an array of responses in the same order as the requests:
+
+```typescript
+const [statusResult, accountResult] = results;
+
+console.log('Node Status:', statusResult.result);
+console.log('Account Info:', accountResult.result);
+```
+
+<Callout type="info">
+Batch requests are processed independently. If one request fails, others may still succeed. Check each result individually for errors.
+</Callout>
+
+## Use Cases
+
+### Multi-Account Balance Check
+
+Query balances for multiple accounts efficiently:
+
+```typescript
+async function getMultipleBalances(accountIds: string[]) {
+  const requests = accountIds.map((accountId, index) => ({
+    jsonrpc: '2.0',
+    id: index.toString(),
+    method: 'query',
+    params: {
+      request_type: 'view_account',
+      finality: 'final',
+      account_id: accountId
+    }
+  }));
+  
+  const results = await sdk.rpc.batch(requests);
+  
+  return accountIds.map((accountId, index) => ({
+    account: accountId,
+    balance: results[index].result?.amount || '0',
+    error: results[index].error || null
+  }));
+}
+
+const balances = await getMultipleBalances([
+  'alice.near',
+  'bob.near',
+  'charlie.near'
+]);
+
+console.table(balances);
+```
+
+### Token Metadata Batch Lookup
+
+Fetch metadata for multiple tokens:
+
+```typescript
+async function getTokenMetadataBatch(tokenIds: string[]) {
+  const requests = tokenIds.map((tokenId, index) => ({
+    jsonrpc: '2.0',
+    id: index.toString(),
+    method: 'query',
+    params: {
+      request_type: 'call_function',
+      finality: 'final',
+      account_id: tokenId,
+      method_name: 'ft_metadata',
+      args_base64: 'e30=' // "{}"
+    }
+  }));
+  
+  const results = await sdk.rpc.batch(requests);
+  
+  return tokenIds.map((tokenId, index) => {
+    if (results[index].error) {
+      return { tokenId, metadata: null, error: results[index].error };
+    }
+    
+    const metadata = JSON.parse(
+      Buffer.from(results[index].result.result).toString()
+    );
+    
+    return { tokenId, metadata, error: null };
+  });
+}
+
+const tokens = await getTokenMetadataBatch([
+  'usdt.tether-token.near',
+  'usdc.near',
+  'wrap.near'
+]);
+
+tokens.forEach(t => {
+  if (t.metadata) {
+    console.log(`${t.metadata.symbol}: ${t.metadata.name}`);
+  }
+});
+```
+
+### Smart Contract State Query
+
+Query contract state and storage:
+
+```typescript
+async function queryContractState(
+  contractId: string,
+  prefix: string = ''
+) {
+  const prefixBase64 = Buffer.from(prefix).toString('base64');
+  
+  const result = await sdk.rpc.proxy({
+    jsonrpc: '2.0',
+    id: '1',
+    method: 'query',
+    params: {
+      request_type: 'view_state',
+      finality: 'final',
+      account_id: contractId,
+      prefix_base64: prefixBase64
+    }
+  });
+  
+  return result.result.values.map(item => ({
+    key: Buffer.from(item.key, 'base64').toString(),
+    value: Buffer.from(item.value, 'base64').toString()
+  }));
+}
+
+const state = await queryContractState('contract.near', 'STATE_');
+console.log('Contract state:', state);
+```
+
+### Access Key Checker
+
+Check access keys for an account:
+
+```typescript
+async function getAccessKeys(accountId: string) {
+  const result = await sdk.rpc.proxy({
+    jsonrpc: '2.0',
+    id: '1',
+    method: 'query',
+    params: {
+      request_type: 'view_access_key_list',
+      finality: 'final',
+      account_id: accountId
+    }
+  });
+  
+  return result.result.keys.map(key => ({
+    publicKey: key.public_key,
+    accessKey: key.access_key
+  }));
+}
+
+const keys = await getAccessKeys('example.near');
+console.log(`Found ${keys.length} access keys`);
+keys.forEach(k => {
+  console.log(`- ${k.publicKey}`);
+});
+```
+
+### Gas Price Monitor
+
+Track current gas prices:
+
+```typescript
+async function getGasPrice() {
+  const result = await sdk.rpc.proxy({
+    jsonrpc: '2.0',
+    id: '1',
+    method: 'gas_price',
+    params: [null] // null for latest block
+  });
+  
+  const gasPrice = result.result.gas_price;
+  
+  return {
+    gasPrice,
+    gasPriceGigaGas: (BigInt(gasPrice) / BigInt(1e9)).toString(),
+    timestamp: new Date().toISOString()
+  };
+}
+
+const gas = await getGasPrice();
+console.log(`Current gas price: ${gas.gasPriceGigaGas} GigaGas`);
+```
+
+### Block Range Query
+
+Fetch multiple blocks in sequence:
+
+```typescript
+async function getBlockRange(
+  startHeight: number,
+  count: number
+) {
+  const requests = Array.from({ length: count }, (_, i) => ({
+    jsonrpc: '2.0',
+    id: i.toString(),
+    method: 'block',
+    params: {
+      block_id: startHeight + i
+    }
+  }));
+  
+  const results = await sdk.rpc.batch(requests);
+  
+  return results.map((result, index) => ({
+    height: startHeight + index,
+    hash: result.result?.header.hash || null,
+    timestamp: result.result?.header.timestamp || null,
+    error: result.error || null
+  }));
+}
+
+const blocks = await getBlockRange(179500000, 5);
+console.table(blocks);
+```
+
+### NFT Ownership Verification
+
+Verify NFT ownership by calling contract:
+
+```typescript
+async function verifyNFTOwnership(
+  contractId: string,
+  tokenId: string,
+  expectedOwner: string
+) {
+  const args = JSON.stringify({ token_id: tokenId });
+  const argsBase64 = Buffer.from(args).toString('base64');
+  
+  const result = await sdk.rpc.proxy({
+    jsonrpc: '2.0',
+    id: '1',
+    method: 'query',
+    params: {
+      request_type: 'call_function',
+      finality: 'final',
+      account_id: contractId,
+      method_name: 'nft_token',
+      args_base64: argsBase64
+    }
+  });
+  
+  const token = JSON.parse(
+    Buffer.from(result.result.result).toString()
+  );
+  
+  return {
+    tokenId,
+    owner: token.owner_id,
+    isOwner: token.owner_id === expectedOwner,
+    metadata: token.metadata
+  };
+}
+
+const ownership = await verifyNFTOwnership(
+  'paras-token-v2.near',
+  '12345:1',
+  'alice.near'
+);
+
+console.log(`Owner: ${ownership.owner}`);
+console.log(`Is Alice the owner? ${ownership.isOwner}`);
+```
+
+### Validator Delegation Query
+
+Check staking delegation:
+
+```typescript
+async function getDelegation(
+  accountId: string,
+  poolId: string
+) {
+  const args = JSON.stringify({ account_id: accountId });
+  const argsBase64 = Buffer.from(args).toString('base64');
+  
+  const result = await sdk.rpc.proxy({
+    jsonrpc: '2.0',
+    id: '1',
+    method: 'query',
+    params: {
+      request_type: 'call_function',
+      finality: 'final',
+      account_id: poolId,
+      method_name: 'get_account',
+      args_base64: argsBase64
+    }
+  });
+  
+  const account = JSON.parse(
+    Buffer.from(result.result.result).toString()
+  );
+  
+  return {
+    accountId,
+    poolId,
+    stakedBalance: account.staked_balance,
+    unstakedBalance: account.unstaked_balance,
+    canWithdraw: account.can_withdraw
+  };
+}
+
+const delegation = await getDelegation('alice.near', 'pool.near');
+console.log('Staking info:', delegation);
+```
+
+### Protocol Config Query
+
+Get current protocol configuration:
+
+```typescript
+async function getProtocolConfig() {
+  const result = await sdk.rpc.proxy({
+    jsonrpc: '2.0',
+    id: '1',
+    method: 'EXPERIMENTAL_protocol_config',
+    params: {
+      finality: 'final'
+    }
+  });
+  
+  return {
+    chainId: result.result.chain_id,
+    minGasPrice: result.result.min_gas_price,
+    maxGasPrice: result.result.max_gas_price,
+    storageAmountPerByte: result.result.storage_amount_per_byte
+  };
+}
+
+const config = await getProtocolConfig();
+console.log('Protocol config:', config);
+```
+
+## Understanding JSON-RPC
+
+### Request Structure
+
+All RPC requests follow the JSON-RPC 2.0 specification:
+
+```typescript
+{
+  jsonrpc: "2.0",         // Protocol version
+  id: "unique-id",        // Request identifier
+  method: "method_name",  // RPC method to call
+  params: { /* ... */ }   // Method parameters
+}
+```
+
+### Response Structure
+
+Successful responses contain a `result` field:
+
+```typescript
+{
+  jsonrpc: "2.0",
+  id: "unique-id",
+  result: { /* ... */ }  // Method-specific response data
+}
+```
+
+Failed responses contain an `error` field:
+
+```typescript
+{
+  jsonrpc: "2.0",
+  id: "unique-id",
+  error: {
+    code: -32000,
+    message: "Error description",
+    data: { /* optional details */ }
+  }
+}
+```
+
+### Finality Options
+
+Many query methods accept a `finality` parameter:
+
+- **`final`**: Finalized block (recommended for most queries)
+- **`optimistic`**: Latest block (may be reorganized)
+- **`near-final`**: Almost finalized (experimental)
+
+```typescript
+// Using final finality
+const account = await sdk.rpc.proxy({
+  jsonrpc: '2.0',
+  id: '1',
+  method: 'query',
+  params: {
+    request_type: 'view_account',
+    finality: 'final',
+    account_id: 'near'
+  }
+});
+```
+
+### Base64 Encoding
+
+Contract function arguments must be base64-encoded:
+
+```typescript
+// Encoding arguments
+const args = { account_id: 'alice.near' };
+const argsBase64 = Buffer.from(JSON.stringify(args)).toString('base64');
+
+// Decoding results
+const resultBytes = Buffer.from(result.result.result, 'base64');
+const resultData = JSON.parse(resultBytes.toString());
+```
+
+## Best Practices
+
+### Error Handling
+
+<Callout type="warning">
+Always check for both network errors and RPC-level errors in responses.
+</Callout>
+
+```typescript
+async function safeRpcCall(request: any) {
+  try {
+    const response = await sdk.rpc.proxy(request);
+    
+    if (response.error) {
+      console.error('RPC Error:', response.error);
+      return null;
+    }
+    
+    return response.result;
+  } catch (error) {
+    console.error('Network Error:', error);
+    return null;
+  }
+}
+```
+
+### Use Batch for Multiple Calls
+
+<Callout type="tip">
+When you need to make multiple RPC calls, always use batch to reduce latency and improve performance.
+</Callout>
+
+```typescript
+// ❌ Inefficient - Sequential calls
+for (const accountId of accountIds) {
+  const account = await sdk.rpc.proxy({ /* ... */ });
+}
+
+// ✅ Efficient - Batch call
+const requests = accountIds.map(id => ({ /* ... */ }));
+const results = await sdk.rpc.batch(requests);
+```
+
+### Cache Frequently Accessed Data
+
+Cache data that doesn't change often:
+
+```typescript
+class RPCCache {
+  private cache = new Map<string, { data: any; timestamp: number }>();
+  private ttl = 10000; // 10 seconds
+  
+  async call(request: any, cacheKey?: string) {
+    if (cacheKey) {
+      const cached = this.cache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < this.ttl) {
+        return cached.data;
+      }
+    }
+    
+    const result = await sdk.rpc.proxy(request);
+    
+    if (cacheKey && result.result) {
+      this.cache.set(cacheKey, { 
+        data: result, 
+        timestamp: Date.now() 
+      });
+    }
+    
+    return result;
+  }
+}
+```
+
+### Handle Base64 Encoding Properly
+
+Create helper functions for encoding/decoding:
+
+```typescript
+class RPCHelper {
+  static encodeArgs(args: any): string {
+    return Buffer.from(JSON.stringify(args)).toString('base64');
+  }
+  
+  static decodeResult(result: string): any {
+    return JSON.parse(Buffer.from(result, 'base64').toString());
+  }
+  
+  static async callViewFunction(
+    contractId: string,
+    methodName: string,
+    args: any = {}
+  ) {
+    const response = await sdk.rpc.proxy({
+      jsonrpc: '2.0',
+      id: Date.now().toString(),
+      method: 'query',
+      params: {
+        request_type: 'call_function',
+        finality: 'final',
+        account_id: contractId,
+        method_name: methodName,
+        args_base64: this.encodeArgs(args)
+      }
+    });
+    
+    return this.decodeResult(response.result.result);
+  }
+}
+
+// Usage
+const metadata = await RPCHelper.callViewFunction(
+  'wrap.near',
+  'ft_metadata'
+);
+```
+
+## Common RPC Methods Reference
+
+### Query Methods
+
+| Method | Description | Params |
+|--------|-------------|--------|
+| `query` | General query method | `{ request_type, finality, ...}` |
+| `block` | Get block info | `{ finality }` or `{ block_id }` |
+| `chunk` | Get chunk info | `{ chunk_id }` or `{ block_id, shard_id }` |
+| `tx` | Get transaction status | `{ tx_hash, sender_account_id }` |
+| `status` | Get node status | `[]` |
+| `gas_price` | Get gas price | `[block_id]` |
+
+### Query Request Types
+
+| Type | Description |
+|------|-------------|
+| `view_account` | Account information |
+| `view_code` | Contract code |
+| `view_state` | Contract storage |
+| `view_access_key` | Single access key |
+| `view_access_key_list` | All access keys |
+| `call_function` | Call view method |
+
+For support: [support@shadowcorp.dev](mailto:support@shadowcorp.dev)

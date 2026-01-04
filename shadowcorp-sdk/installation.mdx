@@ -1,0 +1,102 @@
+---
+title: "Installation"
+description: "Install and configure the ShadowCorp NEAR Blockchain SDK"
+icon: gear
+---
+
+import { Tabs } from '@/components/ui/tabs'
+import { Callout } from '@/components/ui/callout'
+import { CodeGroup } from '@/components/ui/code-group'
+
+The **ShadowCorp SDK** is a TypeScript-first library that provides full access to the ShadowCorp NEAR Blockchain API. It enables seamless interaction with on-chain data, including:
+
+- Blocks and transactions
+- Fungible & non-fungible token transfers
+- Complete account profiles (balances, staking, DeFi positions, risk scores)
+- Validator metrics
+- Real-time anomaly alerts
+- JSON-RPC proxy
+- Advanced Neo4j Cypher graph queries for forensic analysis
+
+## Prerequisites
+
+- Node.js 18 or higher (latest LTS recommended)
+- Package manager: `npm`, `yarn`, or `pnpm`
+
+## Install the SDK
+
+<CodeGroup>
+
+```bash npm
+npm install shadowcorp
+```
+
+```bash yarn
+yarn add shadowcorp
+```
+
+```bash pnpm
+pnpm add shadowcorp
+```
+
+</CodeGroup>
+
+## Get an API Key
+
+Most endpoints require authentication:
+
+1. Visit the dashboard: https://dashboard.shadowcorp.dev
+2. Sign in or create an account
+3. Navigate to API Keys
+4. Generate a new key with appropriate scopes
+
+<Callout type="warning">
+Never expose your API key in client-side code or public repositories.
+</Callout>
+
+## Initialize the SDK
+
+```typescript
+import { ShadowCorpSDK } from 'shadowcorp';
+
+// Simple initialization
+const sdk = new ShadowCorpSDK('your-api-key');
+```
+
+### Recommended: Use Environment Variables
+
+```typescript
+import { ShadowCorpSDK } from 'shadowcorp';
+
+const sdk = new ShadowCorpSDK(process.env.SHADOWCORP_API_KEY!);
+```
+
+`.env` file (add to `.gitignore`):
+
+```env
+SHADOWCORP_API_KEY=your-api-key-here
+```
+
+## Verify Your Setup
+
+```typescript
+async function verify() {
+  try {
+    const status = await sdk.health.check();
+    console.log('API Status:', status);
+
+    const stats = await sdk.stats.getNetworkStats();
+    console.log('Network stats retrieved successfully');
+  } catch (error) {
+    console.error('Connection failed:', error);
+  }
+}
+
+verify();
+```
+
+A successful health response confirms correct installation and authentication.
+
+For support: [support@shadowcorp.dev](mailto:support@shadowcorp.dev)
+
+You're ready to explore the NEAR blockchain at scale.

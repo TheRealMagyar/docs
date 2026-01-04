@@ -1,0 +1,456 @@
+---
+title: "NFT Collections"
+description: "Access detailed metadata for NFT collections on the NEAR blockchain. Retrieve collection information including name, symbol, icon, base URI, and other standardized metadata fields."
+icon: image
+---
+
+import { Callout } from '@/components/ui/callout'
+
+## Get Collection Metadata
+
+Retrieve comprehensive metadata for an NFT collection using its contract identifier.
+
+```typescript
+import { ShadowCorpSDK } from 'shadowcorp';
+
+const sdk = new ShadowCorpSDK('your-api-key');
+
+const metadata = await sdk.nfts.getCollectionMetadata('asac.near');
+console.log(metadata);
+```
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `collectionId` | `string` | Yes | NFT collection contract identifier (e.g., 'asac.near') |
+
+### Error Handling
+
+```typescript
+try {
+  const metadata = await sdk.nfts.getCollectionMetadata('unknown-collection.near');
+  console.log(metadata);
+} catch (error) {
+  if (error.message.includes('not found')) {
+    console.log('Collection does not exist');
+  } else {
+    console.error('Query failed:', error);
+  }
+}
+```
+
+## Response Structure
+
+The metadata response follows the NEP-177 standard and typically includes:
+
+```typescript
+{
+  spec: string;                       // NFT metadata specification version (e.g., "nft-1.0.0")
+  name: string;                       // Collection name
+  symbol: string;                     // Collection symbol/ticker
+  icon: string | null;                // Collection icon URL (base64 or IPFS)
+  base_uri: string | null;            // Base URI for token metadata
+  reference: string | null;           // URL to additional JSON metadata
+  reference_hash: string | null;      // Base64-encoded SHA-256 hash of reference
+}
+```
+
+### Example Response
+
+```json
+{
+  "spec": "nft-1.0.0",
+  "name": "ASAC NFT Collection",
+  "symbol": "ASAC",
+  "icon": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'...",
+  "base_uri": "https://ipfs.io/ipfs/",
+  "reference": "https://metadata.asac.near/collection.json",
+  "reference_hash": "AK3YRHqKhCJNmKfV6SrutnlWW/icN5J8NUPtKsNXR1M="
+}
+```
+
+## Use Cases
+
+### Collection Browser
+
+Build a collection browser with metadata display:
+
+```typescript
+async function displayCollection(collectionId: string) {
+  const metadata = await sdk.nfts.getCollectionMetadata(collectionId);
+  
+  return {
+    name: metadata.name,
+    symbol: metadata.symbol,
+    contractId: collectionId,
+    icon: metadata.icon,
+    standard: metadata.spec,
+    hasExternalMetadata: !!metadata.reference
+  };
+}
+
+const collection = await displayCollection('asac.near');
+console.log(`
+Collection: ${collection.name} (${collection.symbol})
+Contract: ${collection.contractId}
+Standard: ${collection.standard}
+External Metadata: ${collection.hasExternalMetadata ? 'Yes' : 'No'}
+`);
+```
+
+### Batch Collection Lookup
+
+Retrieve metadata for multiple collections:
+
+```typescript
+async function getCollectionsBatch(collectionIds: string[]) {
+  const results = await Promise.allSettled(
+    collectionIds.map(id => sdk.nfts.getCollectionMetadata(id))
+  );
+  
+  return collectionIds.map((id, index) => {
+    const result = results[index];
+    if (result.status === 'fulfilled') {
+      return { id, metadata: result.value, error: null };
+    } else {
+      return { id, metadata: null, error: result.reason.message };
+    }
+  });
+}
+
+const collections = await getCollectionsBatch([
+  'asac.near',
+  'paras-token-v2.near',
+  'mintbase1.near'
+]);
+
+collections.forEach(col => {
+  if (col.metadata) {
+    console.log(`✓ ${col.id}: ${col.metadata.name}`);
+  } else {
+    console.log(`✗ ${col.id}: ${col.error}`);
+  }
+});
+```
+
+### Collection Comparison
+
+Compare metadata across multiple collections:
+
+```typescript
+async function compareCollections(collectionIds: string[]) {
+  const metadataList = await Promise.all(
+    collectionIds.map(id => sdk.nfts.getCollectionMetadata(id))
+  );
+  
+  const comparison = metadataList.map((metadata, index) => ({
+    contract: collectionIds[index],
+    name: metadata.name,
+    symbol: metadata.symbol,
+    hasIcon: !!metadata.icon,
+    hasBaseUri: !!metadata.base_uri,
+    hasReference: !!metadata.reference,
+    standard: metadata.spec
+  }));
+  
+  return comparison;
+}
+
+const comparison = await compareCollections([
+  'asac.near',
+  'paras-token-v2.near'
+]);
+
+console.table(comparison);
+```
+
+### Icon Downloader
+
+Download and process collection icons:
+
+```typescript
+async function getCollectionIcon(collectionId: string): Promise<string | null> {
+  const metadata = await sdk.nfts.getCollectionMetadata(collectionId);
+  
+  if (!metadata.icon) {
+    return null;
+  }
+  
+  // Handle data URI icons
+  if (metadata.icon.startsWith('data:')) {
+    return metadata.icon;
+  }
+  
+  // Handle IPFS icons
+  if (metadata.icon.startsWith('ipfs://')) {
+    const ipfsHash = metadata.icon.replace('ipfs://', '');
+    return `https://ipfs.io/ipfs/${ipfsHash}`;
+  }
+  
+  // Return as-is for HTTP(S) URLs
+  return metadata.icon;
+}
+
+const iconUrl = await getCollectionIcon('asac.near');
+if (iconUrl) {
+  console.log(`Icon URL: ${iconUrl}`);
+}
+```
+
+### Collection Validator
+
+Validate collection metadata completeness:
+
+```typescript
+async function validateCollection(collectionId: string) {
+  const metadata = await sdk.nfts.getCollectionMetadata(collectionId);
+  
+  const checks = {
+    hasName: !!metadata.name && metadata.name.length > 0,
+    hasSymbol: !!metadata.symbol && metadata.symbol.length > 0,
+    hasIcon: !!metadata.icon,
+    hasBaseUri: !!metadata.base_uri,
+    hasReference: !!metadata.reference,
+    referenceHashMatches: metadata.reference && metadata.reference_hash 
+      ? true // Would need to verify actual hash
+      : null,
+    followsNEP177: metadata.spec && metadata.spec.startsWith('nft-')
+  };
+  
+  const score = Object.values(checks).filter(v => v === true).length;
+  const total = Object.values(checks).filter(v => v !== null).length;
+  
+  return {
+    collectionId,
+    checks,
+    score: `${score}/${total}`,
+    isComplete: score === total
+  };
+}
+
+const validation = await validateCollection('asac.near');
+console.log(`Collection Validation: ${validation.score}`);
+console.log(validation.checks);
+```
+
+### Marketplace Integration
+
+Prepare collection data for marketplace display:
+
+```typescript
+async function getMarketplaceCollectionData(collectionId: string) {
+  const [metadata, transfers] = await Promise.all([
+    sdk.nfts.getCollectionMetadata(collectionId),
+    sdk.transfers.listNftTransfers({ 
+      contract_id: collectionId, 
+      limit: 100 
+    })
+  ]);
+  
+  const uniqueOwners = new Set(
+    transfers.data.map(t => t.to_account_id)
+  );
+  
+  const recentActivity = transfers.data.slice(0, 10).map(t => ({
+    tokenId: t.token_ids[0],
+    from: t.from_account_id || 'Minted',
+    to: t.to_account_id,
+    timestamp: t.block_timestamp
+  }));
+  
+  return {
+    metadata: {
+      name: metadata.name,
+      symbol: metadata.symbol,
+      icon: metadata.icon,
+      description: null // Would come from reference URL
+    },
+    stats: {
+      totalTransfers: transfers.total,
+      uniqueOwners: uniqueOwners.size,
+      recentTransfers: transfers.data.length
+    },
+    recentActivity
+  };
+}
+
+const marketplaceData = await getMarketplaceCollectionData('asac.near');
+console.log('Marketplace Data:', marketplaceData);
+```
+
+### External Metadata Fetcher
+
+Fetch and parse external collection metadata:
+
+```typescript
+async function getFullCollectionMetadata(collectionId: string) {
+  const metadata = await sdk.nfts.getCollectionMetadata(collectionId);
+  
+  let externalMetadata = null;
+  
+  if (metadata.reference) {
+    try {
+      // Resolve IPFS URLs
+      let url = metadata.reference;
+      if (url.startsWith('ipfs://')) {
+        url = `https://ipfs.io/ipfs/${url.replace('ipfs://', '')}`;
+      }
+      
+      const response = await fetch(url);
+      externalMetadata = await response.json();
+      
+      // Verify hash if provided
+      if (metadata.reference_hash) {
+        // In production, verify the SHA-256 hash matches
+        console.log('Reference hash verification needed');
+      }
+    } catch (error) {
+      console.warn('Failed to fetch external metadata:', error);
+    }
+  }
+  
+  return {
+    onChainMetadata: metadata,
+    externalMetadata
+  };
+}
+
+const fullMetadata = await getFullCollectionMetadata('asac.near');
+console.log('On-chain:', fullMetadata.onChainMetadata);
+console.log('External:', fullMetadata.externalMetadata);
+```
+
+## Understanding Collection Metadata
+
+### NEP-177 Standard
+
+The metadata follows the NEP-177 (NFT Metadata) standard, which defines a common interface for NFT collection information on NEAR.
+
+### Icon Formats
+
+Collection icons can be provided in several formats:
+
+1. **Data URI**: Embedded base64-encoded images
+   ```
+   data:image/svg+xml,%3Csvg...
+   data:image/png;base64,iVBORw0KGgo...
+   ```
+
+2. **IPFS**: Decentralized storage
+   ```
+   ipfs://QmX...
+   ```
+
+3. **HTTP(S)**: Traditional web URLs
+   ```
+   https://example.com/icon.png
+   ```
+
+### Base URI
+
+The `base_uri` field provides a prefix for individual token metadata URIs. When combined with a token ID, it forms the complete metadata URL:
+
+```typescript
+const baseUri = metadata.base_uri; // "https://ipfs.io/ipfs/"
+const tokenId = "123";
+const tokenMetadataUrl = `${baseUri}${tokenId}`;
+// Result: "https://ipfs.io/ipfs/123"
+```
+
+### Reference and Reference Hash
+
+The `reference` field points to additional JSON metadata that may include:
+- Detailed collection description
+- Social media links
+- Creator information
+- Banner images
+- External URLs
+
+The `reference_hash` provides integrity verification using SHA-256:
+
+```typescript
+// Pseudocode for verification
+const referenceContent = await fetch(metadata.reference).then(r => r.text());
+const hash = sha256(referenceContent);
+const base64Hash = btoa(hash);
+
+if (base64Hash === metadata.reference_hash) {
+  console.log('Reference integrity verified');
+}
+```
+
+## Best Practices
+
+### Caching Metadata
+
+<Callout type="tip">
+Collection metadata rarely changes. Implement caching to reduce API calls and improve performance.
+</Callout>
+
+```typescript
+class CollectionMetadataCache {
+  private cache = new Map<string, { data: any; timestamp: number }>();
+  private ttl = 3600000; // 1 hour in milliseconds
+  
+  async get(collectionId: string) {
+    const cached = this.cache.get(collectionId);
+    
+    if (cached && Date.now() - cached.timestamp < this.ttl) {
+      return cached.data;
+    }
+    
+    const metadata = await sdk.nfts.getCollectionMetadata(collectionId);
+    this.cache.set(collectionId, { data: metadata, timestamp: Date.now() });
+    
+    return metadata;
+  }
+  
+  invalidate(collectionId: string) {
+    this.cache.delete(collectionId);
+  }
+}
+
+const cache = new CollectionMetadataCache();
+const metadata = await cache.get('asac.near');
+```
+
+### Handling Missing Fields
+
+<Callout type="warning">
+Not all collections implement every metadata field. Always check for null/undefined values before using metadata fields.
+</Callout>
+
+```typescript
+async function getSafeMetadata(collectionId: string) {
+  const metadata = await sdk.nfts.getCollectionMetadata(collectionId);
+  
+  return {
+    name: metadata.name || 'Unknown Collection',
+    symbol: metadata.symbol || 'UNKNOWN',
+    icon: metadata.icon || null,
+    hasExternalMetadata: !!metadata.reference
+  };
+}
+```
+
+### Parallel Lookups
+
+When fetching multiple collections, use `Promise.allSettled` to handle failures gracefully:
+
+```typescript
+async function robustBatchLookup(collectionIds: string[]) {
+  const results = await Promise.allSettled(
+    collectionIds.map(id => sdk.nfts.getCollectionMetadata(id))
+  );
+  
+  return results.map((result, index) => ({
+    id: collectionIds[index],
+    success: result.status === 'fulfilled',
+    data: result.status === 'fulfilled' ? result.value : null,
+    error: result.status === 'rejected' ? result.reason.message : null
+  }));
+}
+```
+
+For support: [support@shadowcorp.dev](mailto:support@shadowcorp.dev)

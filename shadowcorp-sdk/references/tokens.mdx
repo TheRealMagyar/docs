@@ -1,0 +1,539 @@
+---
+title: "Tokens"
+description: "Access detailed information about fungible tokens (FTs) on the NEAR blockchain. Retrieve token metadata including name, symbol, decimals, and icons, as well as comprehensive holder distribution data."
+icon: coins
+---
+
+import { Callout } from '@/components/ui/callout'
+
+## Get Token Metadata
+
+Retrieve comprehensive metadata for a fungible token contract.
+
+```typescript
+import { ShadowCorpSDK } from 'shadowcorp';
+
+const sdk = new ShadowCorpSDK('your-api-key');
+
+const metadata = await sdk.tokens.getMetadata('usdt.tether-token.near');
+console.log(metadata);
+```
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `tokenId` | `string` | Yes | Token contract identifier (e.g., 'usdt.tether-token.near') |
+
+### Response Structure
+
+```typescript
+{
+  contract_id: string;                // Token contract identifier
+  name: string;                       // Token full name
+  symbol: string;                     // Token symbol/ticker
+  decimals: number;                   // Number of decimal places
+  icon: string | null;                // Token icon (base64 data URI or URL)
+}
+```
+
+### Example Response
+
+```json
+{
+  "contract_id": "usdt.tether-token.near",
+  "name": "Tether USD",
+  "symbol": "USDT",
+  "decimals": 6,
+  "icon": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAYAAABw4pVUAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAASbSURBVHgB7Z0NUhNBEIZ7EhEUUEGUS..."
+}
+```
+
+### Error Handling
+
+```typescript
+try {
+  const metadata = await sdk.tokens.getMetadata('unknown-token.near');
+} catch (error) {
+  if (error.message.includes('not found')) {
+    console.log('Token does not exist');
+  } else {
+    console.error('Query failed:', error);
+  }
+}
+```
+
+## Get Token Holders
+
+Retrieve a list of the top token holders sorted by balance.
+
+```typescript
+const holders = await sdk.tokens.getHolders('usdt.tether-token.near');
+console.log(holders);
+```
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `tokenId` | `string` | Yes | Token contract identifier (e.g., 'usdt.tether-token.near') |
+
+<Callout type="info">
+The holders endpoint returns the top holders by balance in descending order. Results are paginated to handle tokens with large holder counts.
+</Callout>
+
+### Response Structure
+
+```typescript
+{
+  data: Array<{
+    account_id: string;               // Holder's account identifier
+    balance: string;                  // Token balance (in smallest unit)
+  }>;
+  total: number;                      // Total number of holders
+  limit: number;                      // Number of results per page
+  offset: number;                     // Current offset
+}
+```
+
+### Example Response
+
+```json
+{
+  "data": [
+    {
+      "account_id": "binance.near",
+      "balance": "123456789000"
+    },
+    {
+      "account_id": "ref-finance.near",
+      "balance": "98765432100"
+    },
+    {
+      "account_id": "whale.near",
+      "balance": "45678901230"
+    }
+  ],
+  "total": 15847,
+  "limit": 3,
+  "offset": 0
+}
+```
+
+## Use Cases
+
+### Token Information Display
+
+Display complete token information with proper formatting:
+
+```typescript
+async function displayTokenInfo(tokenId: string) {
+  const metadata = await sdk.tokens.getMetadata(tokenId);
+  
+  return {
+    contract: metadata.contract_id,
+    name: metadata.name,
+    symbol: metadata.symbol,
+    decimals: metadata.decimals,
+    hasIcon: !!metadata.icon
+  };
+}
+
+const tokenInfo = await displayTokenInfo('usdt.tether-token.near');
+console.log(`
+Token: ${tokenInfo.name} (${tokenInfo.symbol})
+Contract: ${tokenInfo.contract}
+Decimals: ${tokenInfo.decimals}
+Icon: ${tokenInfo.hasIcon ? 'Yes' : 'No'}
+`);
+```
+
+### Format Token Amounts
+
+Convert raw token amounts to human-readable format using decimals:
+
+```typescript
+async function formatTokenAmount(tokenId: string, rawAmount: string) {
+  const metadata = await sdk.tokens.getMetadata(tokenId);
+  const amount = BigInt(rawAmount);
+  const divisor = BigInt(10 ** metadata.decimals);
+  
+  const wholePart = amount / divisor;
+  const fractionalPart = amount % divisor;
+  
+  const formatted = `${wholePart}.${fractionalPart.toString().padStart(metadata.decimals, '0')}`;
+  
+  return {
+    raw: rawAmount,
+    formatted: formatted,
+    symbol: metadata.symbol
+  };
+}
+
+const amount = await formatTokenAmount('usdt.tether-token.near', '123456789');
+console.log(`${amount.formatted} ${amount.symbol}`);
+// Output: "123.456789 USDT"
+```
+
+### Top Holders Analysis
+
+Analyze token holder distribution:
+
+```typescript
+async function analyzeHolders(tokenId: string) {
+  const [metadata, holders] = await Promise.all([
+    sdk.tokens.getMetadata(tokenId),
+    sdk.tokens.getHolders(tokenId)
+  ]);
+  
+  const totalSupplyInHolders = holders.data.reduce(
+    (sum, holder) => sum + BigInt(holder.balance),
+    0n
+  );
+  
+  const topHolderPercentages = holders.data.slice(0, 10).map(holder => {
+    const balance = BigInt(holder.balance);
+    const percentage = (Number(balance) / Number(totalSupplyInHolders)) * 100;
+    return {
+      account: holder.account_id,
+      balance: holder.balance,
+      percentage: percentage.toFixed(2) + '%'
+    };
+  });
+  
+  return {
+    token: `${metadata.name} (${metadata.symbol})`,
+    totalHolders: holders.total,
+    topHolders: topHolderPercentages
+  };
+}
+
+const analysis = await analyzeHolders('usdt.tether-token.near');
+console.log(`${analysis.token}`);
+console.log(`Total Holders: ${analysis.totalHolders}`);
+console.log('Top 10 Holders:');
+analysis.topHolders.forEach((h, i) => {
+  console.log(`${i + 1}. ${h.account}: ${h.percentage}`);
+});
+```
+
+### Token Concentration Calculator
+
+Calculate holder concentration metrics:
+
+```typescript
+async function calculateConcentration(tokenId: string) {
+  const holders = await sdk.tokens.getHolders(tokenId);
+  
+  const totalSupply = holders.data.reduce(
+    (sum, h) => sum + BigInt(h.balance),
+    0n
+  );
+  
+  // Top 10 concentration
+  const top10Balance = holders.data.slice(0, 10).reduce(
+    (sum, h) => sum + BigInt(h.balance),
+    0n
+  );
+  
+  const top10Percentage = (Number(top10Balance) / Number(totalSupply)) * 100;
+  
+  return {
+    totalHolders: holders.total,
+    top10Holders: Math.min(10, holders.data.length),
+    top10Concentration: top10Percentage.toFixed(2) + '%',
+    isHighlyConcentrated: top10Percentage > 50
+  };
+}
+
+const concentration = await calculateConcentration('usdt.tether-token.near');
+console.log(concentration);
+```
+
+### Multi-Token Comparison
+
+Compare metadata across multiple tokens:
+
+```typescript
+async function compareTokens(tokenIds: string[]) {
+  const metadataList = await Promise.all(
+    tokenIds.map(id => sdk.tokens.getMetadata(id))
+  );
+  
+  return metadataList.map(metadata => ({
+    contract: metadata.contract_id,
+    name: metadata.name,
+    symbol: metadata.symbol,
+    decimals: metadata.decimals,
+    hasIcon: !!metadata.icon
+  }));
+}
+
+const comparison = await compareTokens([
+  'usdt.tether-token.near',
+  'usdc.near',
+  'wrap.near'
+]);
+
+console.table(comparison);
+```
+
+### Token Portfolio Value
+
+Calculate portfolio value for multiple token holdings:
+
+```typescript
+interface TokenHolding {
+  tokenId: string;
+  balance: string;
+}
+
+async function calculatePortfolioValue(holdings: TokenHolding[]) {
+  const metadataList = await Promise.all(
+    holdings.map(h => sdk.tokens.getMetadata(h.tokenId))
+  );
+  
+  const portfolioItems = holdings.map((holding, index) => {
+    const metadata = metadataList[index];
+    const balance = BigInt(holding.balance);
+    const divisor = BigInt(10 ** metadata.decimals);
+    const formattedBalance = Number(balance) / Number(divisor);
+    
+    return {
+      token: `${metadata.name} (${metadata.symbol})`,
+      balance: formattedBalance.toFixed(metadata.decimals),
+      contract: metadata.contract_id
+    };
+  });
+  
+  return portfolioItems;
+}
+
+const portfolio = await calculatePortfolioValue([
+  { tokenId: 'usdt.tether-token.near', balance: '1000000' },
+  { tokenId: 'usdc.near', balance: '2000000' },
+  { tokenId: 'wrap.near', balance: '5000000000000000000000000' }
+]);
+
+console.table(portfolio);
+```
+
+### Whale Detector
+
+Identify whale accounts holding significant amounts:
+
+```typescript
+async function detectWhales(tokenId: string, thresholdPercentage: number = 1) {
+  const [metadata, holders] = await Promise.all([
+    sdk.tokens.getMetadata(tokenId),
+    sdk.tokens.getHolders(tokenId)
+  ]);
+  
+  const totalSupply = holders.data.reduce(
+    (sum, h) => sum + BigInt(h.balance),
+    0n
+  );
+  
+  const whales = holders.data.filter(holder => {
+    const balance = BigInt(holder.balance);
+    const percentage = (Number(balance) / Number(totalSupply)) * 100;
+    return percentage >= thresholdPercentage;
+  }).map(holder => {
+    const balance = BigInt(holder.balance);
+    const percentage = (Number(balance) / Number(totalSupply)) * 100;
+    const divisor = BigInt(10 ** metadata.decimals);
+    const formattedBalance = (Number(balance) / Number(divisor)).toFixed(metadata.decimals);
+    
+    return {
+      account: holder.account_id,
+      balance: `${formattedBalance} ${metadata.symbol}`,
+      percentage: percentage.toFixed(2) + '%'
+    };
+  });
+  
+  return {
+    token: `${metadata.name} (${metadata.symbol})`,
+    threshold: `${thresholdPercentage}%`,
+    whalesFound: whales.length,
+    whales
+  };
+}
+
+const whales = await detectWhales('usdt.tether-token.near', 1);
+console.log(`Found ${whales.whalesFound} whales holding >${whales.threshold}`);
+whales.whales.forEach(w => {
+  console.log(`${w.account}: ${w.balance} (${w.percentage})`);
+});
+```
+
+### Token Icon Renderer
+
+Extract and use token icons:
+
+```typescript
+async function getTokenIcon(tokenId: string): Promise<string | null> {
+  const metadata = await sdk.tokens.getMetadata(tokenId);
+  
+  if (!metadata.icon) {
+    return null;
+  }
+  
+  // Handle data URI icons (most common)
+  if (metadata.icon.startsWith('data:')) {
+    return metadata.icon;
+  }
+  
+  // Handle IPFS icons
+  if (metadata.icon.startsWith('ipfs://')) {
+    const ipfsHash = metadata.icon.replace('ipfs://', '');
+    return `https://ipfs.io/ipfs/${ipfsHash}`;
+  }
+  
+  // Return HTTP(S) URLs as-is
+  return metadata.icon;
+}
+
+const iconUrl = await getTokenIcon('usdt.tether-token.near');
+if (iconUrl) {
+  console.log(`Icon URL: ${iconUrl.substring(0, 50)}...`);
+}
+```
+
+## Understanding Token Data
+
+### Decimals
+
+The `decimals` field indicates how many decimal places the token uses. Most tokens use 18 decimals (like ETH), but stablecoins often use 6 (like USDC/USDT):
+
+```typescript
+// USDT with 6 decimals
+// Raw: "1000000" = 1.000000 USDT
+
+// NEAR with 24 decimals  
+// Raw: "1000000000000000000000000" = 1 NEAR
+
+function formatWithDecimals(amount: string, decimals: number): string {
+  const value = BigInt(amount);
+  const divisor = BigInt(10 ** decimals);
+  const whole = value / divisor;
+  const fraction = value % divisor;
+  return `${whole}.${fraction.toString().padStart(decimals, '0')}`;
+}
+```
+
+### Icon Format
+
+Token icons are typically provided as base64-encoded data URIs:
+
+```typescript
+// Example format:
+"data:image/png;base64,iVBORw0KGgo..."
+"data:image/svg+xml,%3Csvg..."
+```
+
+This allows the icon to be embedded directly without external requests.
+
+### Holder Balances
+
+Holder balances are returned as strings in the token's smallest unit to preserve precision:
+
+```typescript
+const holders = await sdk.tokens.getHolders('usdt.tether-token.near');
+const metadata = await sdk.tokens.getMetadata('usdt.tether-token.near');
+
+holders.data.forEach(holder => {
+  const rawBalance = holder.balance; // "123456789000"
+  const formatted = formatWithDecimals(rawBalance, metadata.decimals);
+  console.log(`${holder.account_id}: ${formatted} ${metadata.symbol}`);
+});
+```
+
+## Best Practices
+
+### Cache Token Metadata
+
+<Callout type="tip">
+Token metadata rarely changes. Implement caching to reduce API calls and improve performance.
+</Callout>
+
+```typescript
+class TokenMetadataCache {
+  private cache = new Map<string, { data: any; timestamp: number }>();
+  private ttl = 86400000; // 24 hours
+  
+  async get(tokenId: string) {
+    const cached = this.cache.get(tokenId);
+    
+    if (cached && Date.now() - cached.timestamp < this.ttl) {
+      return cached.data;
+    }
+    
+    const metadata = await sdk.tokens.getMetadata(tokenId);
+    this.cache.set(tokenId, { data: metadata, timestamp: Date.now() });
+    
+    return metadata;
+  }
+}
+
+const cache = new TokenMetadataCache();
+const metadata = await cache.get('usdt.tether-token.near');
+```
+
+### Use BigInt for Amounts
+
+<Callout type="warning">
+Always use `BigInt` for token amounts to avoid precision loss with large numbers.
+</Callout>
+
+```typescript
+// ❌ Incorrect - loses precision
+const balance = Number('999999999999999999999999');
+
+// ✅ Correct - preserves precision
+const balance = BigInt('999999999999999999999999');
+```
+
+### Handle Missing Icons
+
+Not all tokens have icons defined:
+
+```typescript
+async function getSafeTokenInfo(tokenId: string) {
+  const metadata = await sdk.tokens.getMetadata(tokenId);
+  
+  return {
+    ...metadata,
+    icon: metadata.icon || 'https://placeholder.com/token-icon.png'
+  };
+}
+```
+
+### Paginate Through Holders
+
+For tokens with many holders, implement pagination:
+
+```typescript
+async function getAllHolders(tokenId: string) {
+  const allHolders = [];
+  let offset = 0;
+  const limit = 100;
+  
+  while (true) {
+    // Note: The API might support limit/offset parameters
+    // Check the actual API documentation for pagination support
+    const response = await sdk.tokens.getHolders(tokenId);
+    
+    allHolders.push(...response.data);
+    
+    if (response.data.length < limit || allHolders.length >= response.total) {
+      break;
+    }
+    
+    offset += limit;
+  }
+  
+  return allHolders;
+}
+```
+
+For support: [support@shadowcorp.dev](mailto:support@shadowcorp.dev)

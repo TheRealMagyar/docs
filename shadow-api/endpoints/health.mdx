@@ -1,0 +1,66 @@
+---
+title: Health Check
+description: API health check endpoint
+icon: heart-pulse
+---
+
+import { Endpoint } from '@mintlify/components';
+
+## Making Requests
+<Tabs>
+  <Tab title="cURL">
+    ```bash
+    curl https://api.shadowcorp.dev/health
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    const checkHealth = async () => {
+      const response = await fetch('https://api.shadowcorp.dev/health');
+      const data = await response.json();
+      console.log('API Status:', data);
+    };
+
+    checkHealth();
+    ```
+  </Tab>
+  
+  <Tab title="Python">
+    ```python
+    import requests
+
+    response = requests.get('https://api.shadowcorp.dev/health')
+    print('API Status:', response.json())
+    ```
+  </Tab>
+  
+  <Tab title="Go">
+    ```go
+    package main
+
+    import (
+        "encoding/json"
+        "fmt"
+        "net/http"
+    )
+
+    func main() {
+        resp, err := http.Get("https://api.shadowcorp.dev/health")
+        if err != nil {
+            panic(err)
+        }
+        defer resp.Body.Close()
+
+        var result map[string]interface{}
+        json.NewDecoder(resp.Body).Decode(&result)
+        fmt.Println("API Status:", result)
+    }
+    ```
+  </Tab>
+</Tabs>
+
+<Check>
+  A `OK` status code indicates the API is healthy and operational.
+</Check>
+---

@@ -1,0 +1,370 @@
+---
+title: "Transactions"
+description: "Query NEAR blockchain transactions with flexible filtering options, retrieve specific transactions by hash, or perform batch lookups for multiple transactions at once."
+icon: swap
+---
+
+import { Callout } from '@/components/ui/callout'
+import { CodeGroup } from '@/components/ui/code-group'
+
+## List Transactions
+
+List transactions with filtering options for account, block height, and pagination.
+
+```typescript
+import { ShadowCorpSDK } from 'shadowcorp';
+
+const sdk = new ShadowCorpSDK('your-api-key');
+
+// All transactions (paginated)
+const txs = await sdk.transactions.list({ 
+  limit: 50 
+});
+console.log(txs);
+```
+
+### Filter by Account
+
+Retrieve all transactions for a specific account:
+
+```typescript
+const accountTxs = await sdk.transactions.list({
+  account: 'example.near',
+  limit: 20
+});
+```
+
+### Filter by Block Height
+
+Get all transactions from a specific block:
+
+```typescript
+const blockTxs = await sdk.transactions.list({
+  block_height: 178978800
+});
+```
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `limit` | `number` | No | Number of results to return (default: 50, max: 100) |
+| `offset` | `number` | No | Number of results to skip for pagination |
+| `account` | `string` | No | Filter by account ID (sender or receiver) |
+| `block_height` | `number` | No | Filter by specific block height |
+| `from_block` | `number` | No | Filter from block height (inclusive) |
+| `to_block` | `number` | No | Filter to block height (inclusive) |
+
+<Callout type="info">
+When filtering by account, the results include transactions where the account is either the sender or receiver.
+</Callout>
+
+## Get Transaction by Hash
+
+Retrieve detailed information about a specific transaction using its hash.
+
+```typescript
+const tx = await sdk.transactions.getByHash('TRANSACTION_HASH');
+console.log(tx);
+```
+
+### Example with Real Hash
+
+```typescript
+const hash = '8FqKsvXABrzExdiMCwyHnDieHEhhudmFuqnZ3gNKDgpc';
+const tx = await sdk.transactions.getByHash(hash);
+
+console.log({
+  hash: tx.tx_hash,
+  signer: tx.signer_account_id,
+  receiver: tx.receiver_account_id,
+  status: tx.status,
+  block_height: tx.block_height,
+  timestamp: tx.block_timestamp,
+  description: tx.description
+});
+```
+
+### Error Handling
+
+```typescript
+try {
+  const tx = await sdk.transactions.getByHash('invalid-hash');
+} catch (error) {
+  if (error.message.includes('not found')) {
+    console.log('Transaction does not exist');
+  } else {
+    console.error('Query failed:', error);
+  }
+}
+```
+
+## Batch Lookup
+
+Retrieve multiple transactions in a single API call for improved performance.
+
+```typescript
+const txs = await sdk.transactions.batchLookup({
+  tx_hashes: [
+    'hash1',
+    'hash2', 
+    'hash3'
+  ]
+});
+console.log(txs);
+```
+
+<Callout type="warning">
+Maximum 20 transaction hashes per batch request. Requests with more than 20 hashes will be rejected.
+</Callout>
+
+### Batch Lookup Example
+
+```typescript
+const hashes = [
+  '8FqKsvXABrzExdiMCwyHnDieHEhhudmFuqnZ3gNKDgpc',
+  'D8xKFKqH2Hh3VxPZkqKfqyNKKvZqxzKYZxZqxzKYZxZq',
+  'A1bCdEfG2HiJkLmNoPqRsTuVwXyZ1234567890AbCdEf'
+];
+
+try {
+  const transactions = await sdk.transactions.batchLookup({
+    tx_hashes: hashes
+  });
+  
+  console.log(`Retrieved ${transactions.length} transactions`);
+  
+  transactions.forEach(tx => {
+    console.log(`${tx.tx_hash}: ${tx.status} - ${tx.description}`);
+  });
+} catch (error) {
+  console.error('Batch lookup failed:', error);
+}
+```
+
+## Use Cases
+
+### Transaction History
+
+Build a complete transaction history for an account:
+
+```typescript
+async function getAccountHistory(accountId: string) {
+  let allTransactions = [];
+  let offset = 0;
+  const limit = 100;
+  let hasMore = true;
+  
+  while (hasMore) {
+    const txs = await sdk.transactions.list({
+      account: accountId,
+      limit,
+      offset
+    });
+    
+    allTransactions.push(...txs);
+    hasMore = txs.length === limit;
+    offset += limit;
+  }
+  
+  return allTransactions;
+}
+
+const history = await getAccountHistory('alice.near');
+console.log(`Total transactions: ${history.length}`);
+```
+
+### Block Analysis
+
+Analyze all transactions in a specific block:
+
+```typescript
+async function analyzeBlock(blockHeight: number) {
+  const txs = await sdk.transactions.list({
+    block_height: blockHeight
+  });
+  
+  const stats = {
+    total: txs.length,
+    successful: txs.filter(tx => tx.status === 'success').length,
+    failed: txs.filter(tx => tx.status === 'failure').length,
+    pending: txs.filter(tx => tx.status === 'pending').length,
+    uniqueAccounts: new Set([
+      ...txs.map(tx => tx.signer_account_id),
+      ...txs.map(tx => tx.receiver_account_id)
+    ]).size
+  };
+  
+  return stats;
+}
+
+const blockStats = await analyzeBlock(178994357);
+console.log(blockStats);
+```
+
+### Recent Activity Monitoring
+
+Monitor recent transactions across the network:
+
+```typescript
+async function monitorRecentTransactions() {
+  const stats = await sdk.stats.getNetworkStats();
+  const currentBlock = stats.latest_block_height;
+  
+  // Get transactions from last 10 blocks
+  const recentTxs = await sdk.transactions.list({
+    from_block: currentBlock - 10,
+    to_block: currentBlock,
+    limit: 100
+  });
+  
+  console.log(`${recentTxs.length} transactions in last 10 blocks`);
+  return recentTxs;
+}
+```
+
+### Verify Multiple Transactions
+
+Check the status of multiple transactions efficiently:
+
+```typescript
+async function verifyTransactionBatch(hashes: string[]) {
+  // Process in batches of 20
+  const results = [];
+  
+  for (let i = 0; i < hashes.length; i += 20) {
+    const batch = hashes.slice(i, i + 20);
+    const txs = await sdk.transactions.batchLookup({
+      tx_hashes: batch
+    });
+    results.push(...txs);
+  }
+  
+  const summary = {
+    total: results.length,
+    successful: results.filter(tx => tx.status === 'success').length,
+    failed: results.filter(tx => tx.status === 'failure').length,
+    pending: results.filter(tx => tx.status === 'pending').length
+  };
+  
+  return { transactions: results, summary };
+}
+
+const hashes = ['hash1', 'hash2', 'hash3', /* ... up to 100+ hashes */];
+const verification = await verifyTransactionBatch(hashes);
+console.log(verification.summary);
+```
+
+## Transaction Response Structure
+
+A typical transaction object contains:
+
+```typescript
+{
+  tx_hash: string;                    // Unique transaction identifier
+  block_timestamp: string;            // ISO 8601 timestamp of the block
+  block_height: number;               // Block where transaction was included
+  signer_account_id: string;          // Account that signed the transaction
+  receiver_account_id: string;        // Target account
+  status: string;                     // Transaction status (e.g., 'pending', 'success', 'failure')
+  description: string;                // Human-readable transaction description
+  actions: Array<{                    // Actions performed in transaction
+    action_kind: string;
+    args: object;
+  }>;
+}
+```
+
+### Example Response
+
+```json
+{
+  "tx_hash": "8FqKsvXABrzExdiMCwyHnDieHEhhudmFuqnZ3gNKDgpc",
+  "block_timestamp": "2025-12-30T12:51:47.687037Z",
+  "block_height": 178994357,
+  "signer_account_id": "therealmagyar.near",
+  "receiver_account_id": "17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1",
+  "status": "pending",
+  "description": "Sent tokens on 17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1",
+  "actions": [
+    {
+      "action_kind": "FUNCTION_CALL",
+      "args": { /* ... */ }
+    }
+  ]
+}
+```
+
+## Best Practices
+
+### Pagination
+
+Always implement pagination for large queries:
+
+```typescript
+async function* paginateTransactions(params: any) {
+  let offset = 0;
+  const limit = 100;
+  
+  while (true) {
+    const txs = await sdk.transactions.list({
+      ...params,
+      limit,
+      offset
+    });
+    
+    if (txs.length === 0) break;
+    
+    yield txs;
+    
+    if (txs.length < limit) break;
+    offset += limit;
+  }
+}
+
+// Usage
+for await (const batch of paginateTransactions({ account: 'alice.near' })) {
+  console.log(`Processing ${batch.length} transactions`);
+  // Process batch
+}
+```
+
+### Efficient Batch Processing
+
+<Callout type="tip">
+Use batch lookup when you need to retrieve multiple specific transactions. It's significantly faster than individual requests.
+</Callout>
+
+```typescript
+// ❌ Inefficient - Multiple individual requests
+for (const hash of hashes) {
+  const tx = await sdk.transactions.getByHash(hash);
+  // Process tx
+}
+
+// ✅ Efficient - Single batch request
+const txs = await sdk.transactions.batchLookup({ tx_hashes: hashes });
+for (const tx of txs) {
+  // Process tx
+}
+```
+
+### Error Handling
+
+Always handle potential errors gracefully:
+
+```typescript
+async function safeGetTransaction(hash: string) {
+  try {
+    return await sdk.transactions.getByHash(hash);
+  } catch (error) {
+    if (error.status === 404) {
+      console.log(`Transaction ${hash} not found`);
+      return null;
+    }
+    throw error; // Re-throw unexpected errors
+  }
+}
+```
+
+For support: [support@shadowcorp.dev](mailto:support@shadowcorp.dev)

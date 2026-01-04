@@ -1,0 +1,265 @@
+---
+title: "Installation"
+description: "NearConnect is a comprehensive NEAR Protocol wallet connector library with a four-tier architecture supporting web wallets, browser extensions, hardware wallets, and mobile wallets."
+icon: gear
+---
+
+import { Callout } from '@/components/ui/callout'
+
+<Callout type="info">
+**Fork Notice**: This is an enhanced fork of `azbang/near-connect` (commit c72689d) with significant improvements in security, reliability, and wallet support.
+</Callout>
+
+## Install the Library
+
+Install NearConnect using your preferred package manager:
+
+```bash npm
+npm install @shadowcorp/near-connect
+```
+
+```bash yarn
+yarn add @shadowcorp/near-connect
+```
+
+```bash pnpm
+pnpm add @shadowcorp/near-connect
+```
+
+## Prerequisites
+
+- Node.js 16 or higher
+- Modern browser with ES2020+ support
+- NEAR wallet or compatible wallet application
+
+## Four-Tier Wallet Architecture
+
+NearConnect uses a four-tier architecture that treats each wallet type according to its actual trust level and capabilities:
+
+| Tier | Type | Trust Level | Security Model |
+|------|------|-------------|----------------|
+| 1 | Sandboxed (Web) | Untrusted | Iframe isolation + origin verification |
+| 2 | Injected (Extensions) | Semi-trusted | Browser extension sandbox + permission model |
+| 3 | Privileged (Hardware) | Trusted | Physical device confirmation required |
+| 4 | External (Mobile) | Verified | Cryptographic signatures + callback verification |
+
+### Why Four Tiers?
+
+The original NEAR wallet connector relied heavily on iframe sandboxing for security. While sandboxes provide isolation, they have significant limitations. The four-tier architecture addresses these limitations by providing **defense-in-depth** rather than relying on any single security mechanism.
+
+## Basic Configuration
+
+Initialize the connector with your network and optional configurations:
+
+```typescript
+import { NearConnector } from "@shadowcorp/near-connect";
+
+const connector = new NearConnector({
+  network: "mainnet", // or "testnet"
+  
+  // Optional: Hardware wallet configuration
+  hardware: {
+    ledger: { enabled: true }
+  },
+  
+  // Optional: WalletConnect for mobile wallets
+  external: {
+    walletConnect: { 
+      projectId: "your-project-id" 
+    }
+  }
+});
+```
+
+## Environment Variables
+
+For production applications, use environment variables for configuration:
+
+```env
+NEAR_NETWORK=mainnet
+NEAR_RPC_URL=https://rpc.mainnet.near.org
+WALLETCONNECT_PROJECT_ID=your-project-id
+```
+
+```typescript
+const connector = new NearConnector({
+  network: process.env.NEAR_NETWORK as "mainnet" | "testnet",
+  rpcUrl: process.env.NEAR_RPC_URL,
+  external: {
+    walletConnect: { 
+      projectId: process.env.WALLETCONNECT_PROJECT_ID 
+    }
+  }
+});
+```
+
+## Hardware Wallet Setup (Optional)
+
+To enable Ledger hardware wallet support, ensure your application has the necessary permissions:
+
+### Browser Requirements
+
+- Chrome/Edge 89+ or Firefox 87+
+- HTTPS connection (required for WebHID API)
+- User gesture to initiate connection (e.g., button click)
+
+### Configuration
+
+```typescript
+import { createLedgerWallet } from "@shadowcorp/near-connect";
+
+const ledger = createLedgerWallet({
+  network: "mainnet",
+  rpcUrl: "https://rpc.mainnet.near.org"
+});
+
+// Listen for hardware events
+ledger.on("waiting", ({ action }) => {
+  console.log(`Please ${action} on your Ledger device...`);
+});
+
+ledger.on("confirm", ({ action }) => {
+  console.log(`Action confirmed: ${action}`);
+});
+```
+
+## Mobile Wallet Setup (Optional)
+
+For mobile wallet support via WalletConnect:
+
+### Get a WalletConnect Project ID
+
+1. Visit [WalletConnect Cloud](https://cloud.walletconnect.com)
+2. Create a new project
+3. Copy your Project ID
+
+### Configuration
+
+```typescript
+import { ExternalWalletManager } from "@shadowcorp/near-connect";
+
+const external = new ExternalWalletManager({
+  network: "mainnet",
+  appName: "My dApp",
+  appUrl: "https://mydapp.com",
+  callbackUrl: "https://mydapp.com/callback",
+  walletConnect: {
+    projectId: "your-walletconnect-project-id"
+  }
+});
+```
+
+## Content Security Policy
+
+For production deployments, configure proper CSP headers:
+
+```typescript
+import { getRecommendedCSP } from "@shadowcorp/near-connect";
+
+const csp = getRecommendedCSP();
+```
+
+Add to your HTML or server configuration:
+
+```html
+<meta http-equiv="Content-Security-Policy" content="...">
+```
+
+Or in Express.js:
+
+```javascript
+const helmet = require('helmet');
+
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      connectSrc: ["'self'", "https://rpc.mainnet.near.org"],
+      frameSrc: ["https://wallet.meteorwallet.app"],
+      // ... other directives
+    }
+  }
+}));
+```
+
+## Verify Installation
+
+Test your setup with a simple connection:
+
+```typescript
+import { NearConnector } from "@shadowcorp/near-connect";
+
+async function testSetup() {
+  const connector = new NearConnector({
+    network: "testnet"
+  });
+  
+  // Get available wallets
+  const wallets = connector.getWallets();
+  console.log(`Found ${wallets.length} available wallets`);
+  
+  // List wallet details
+  wallets.forEach(wallet => {
+    console.log(`- ${wallet.name} (${wallet.id})`);
+  });
+}
+
+testSetup();
+```
+
+## TypeScript Support
+
+NearConnect is written in TypeScript and includes full type definitions:
+
+```typescript
+import type {
+  NearConnectorConfig,
+  WalletMetadata,
+  SignAndSendTransactionParams,
+  Transaction
+} from "@shadowcorp/near-connect";
+
+const config: NearConnectorConfig = {
+  network: "mainnet",
+  hardware: {
+    ledger: { enabled: true }
+  }
+};
+```
+
+## Browser Compatibility
+
+NearConnect supports modern browsers with the following minimum versions:
+
+| Browser | Version |
+|---------|---------|
+| Chrome | 89+ |
+| Firefox | 87+ |
+| Safari | 14+ |
+| Edge | 89+ |
+
+<Callout type="warning">
+Hardware wallet support requires WebHID API, which is only available in Chromium-based browsers (Chrome, Edge, Opera) and requires HTTPS.
+</Callout>
+
+## Bundle Size
+
+NearConnect is optimized for tree-shaking. Core bundle sizes:
+
+- **Core library**: ~45 KB (gzipped)
+- **With hardware wallets**: ~65 KB (gzipped)
+- **With UI components**: ~85 KB (gzipped)
+- **Full bundle**: ~120 KB (gzipped)
+
+### Optimize Bundle Size
+
+Import only what you need:
+
+```typescript
+// Import specific modules
+import { NearConnector } from "@shadowcorp/near-connect/core";
+import { LedgerWallet } from "@shadowcorp/near-connect/hardware";
+import { WalletSelectorModal } from "@shadowcorp/near-connect/ui";
+```
+
+For support: [support@shadowcorp.dev](mailto:support@shadowcorp.dev)
